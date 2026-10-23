@@ -1,0 +1,8 @@
+{
+  "qaUser": {
+    "email": "qa-user@example.com",
+    "password": "<пароль тест-учётки>",
+    "org": "BORD QA",
+    "tempPassword": "<второй пароль для теста смены пароля>"
+  }
+}

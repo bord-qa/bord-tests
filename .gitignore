@@ -1,0 +1,30 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+venv/
+.venv/
+.env
+
+# --- Playwright / MCP ---
+.playwright-mcp/
+test-results/
+playwright-report/
+
+# --- Claude / dev tools ---
+.claude/
+.mcp.json
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Секреты: учётки и сохранённая сессия ---
+tests/fixtures/users.json
+.auth/
+
+# --- Отчёты прогонов ---
+report*.html
+*.log
