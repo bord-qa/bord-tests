@@ -1,0 +1,88 @@
+name: E2E Tests (app.bord.one)
+
+# E2E прогон против прода app.bord.one. Данные тесты пишут только в организацию
+# BORD QA и убирают за собой. Public API (маркер manual) сюда не входит: каждый
+# прогон тратит токены, которые нельзя вернуть (ecom-100162).
+on:
+  # Ночью, 03:00 UTC (06:00 Кишинёв летом, 05:00 зимой).
+  schedule:
+    - cron: "0 3 * * *"
+  # Ручной запуск кнопкой в Actions. Дефолты повторяют ночной прогон.
+  workflow_dispatch:
+    inputs:
+      markers:
+        description: 'Выражение -m (пусто = вся суита без manual, как ночью)'
+        default: ''
+        required: false
+      paths:
+        description: 'Ограничить прогон путями (пусто = вся суита)'
+        default: ''
+        required: false
+      k_filter:
+        description: 'Фильтр -k по именам тестов (пусто = без фильтра)'
+        default: ''
+        required: false
+
+# Два прогона одновременно мешали бы друг другу в BORD QA (тест смены пароля
+# меняет пароль общей учётки) — второй ждёт, пока закончится первый.
+concurrency:
+  group: e2e-bord
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    # Локально суита идёт ~11 мин; 40 — запас на медленную сеть и ретраи.
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browser (chromium)
+        run: python -m playwright install --with-deps chromium
+
+      # Учётка — из секрета USERS_JSON (то же содержимое, что users.json
+      # локально; helpers/auth.py читает его из env). Нет секрета — тесты
+      # со входом скипнутся с понятным текстом.
+      - name: Run E2E tests
+        env:
+          USERS_JSON: ${{ secrets.USERS_JSON }}
+          MARKERS: ${{ inputs.markers }}
+          PATHS: ${{ inputs.paths }}
+          K_FILTER: ${{ inputs.k_filter }}
+        run: |
+          echo "Прогон: ${MARKERS:+-m \"$MARKERS\"}${MARKERS:-вся суита без manual}${PATHS:+ | пути: $PATHS}${K_FILTER:+ | -k $K_FILTER}"
+          python -m pytest --browser chromium \
+                 ${MARKERS:+-m "$MARKERS"} \
+                 ${PATHS} \
+                 ${K_FILTER:+-k "$K_FILTER"} \
+                 --timeout=120 \
+                 --screenshot=only-on-failure \
+                 --output=test-results \
+                 --html=report.html --self-contained-html
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-html-report
+          path: report.html
+          retention-days: 14
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
