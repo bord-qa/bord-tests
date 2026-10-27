@@ -15,8 +15,14 @@
 - повтор: у задачи с repeat_rule «Сделана» порождает следующую (repeat_from_id,
   срок + период), в строке «раз в нед.»;
 - карточка (клик по задаче): чек-лист (POST/PATCH /api/tasks/<id>/checklist),
-  файлы («Приложить» → POST /api/tasks/<id>/files — 22.10 отвечает 500,
-  ecom-100157), обсуждение;
+  файлы («Приложить» → POST /api/tasks/<id>/files — 22.10 отвечал 500,
+  ecom-100157; 27.10 уже 201), обсуждение;
+- обсуждение (снято 27.10.2026): общий сервис комментариев — GET
+  /api/comments/?entity_type=task&entity_id=<id>&threaded=false, «Написать по
+  задаче» + Enter → POST /api/comments/ {entity_type, entity_id, content} → 201;
+  в ленте «<автор> · ДД.ММ.ГГГГ, ЧЧ:ММ» и текст. Правки и удаления в интерфейсе
+  нет; из одних пробелов кнопка отправки неактивна. Комментарии переживают
+  удаление задачи — уборка удаляет их сама (DELETE /api/comments/<id>);
 - «С чего начать» (/api/tasks/onboarding/checklist) считается по задачам
   организации: удалили задачи — пункты снова не сделаны.
 
@@ -74,7 +80,18 @@ def delete_qa_tasks(page: Page):
     resp = api_get(page, f"{API}?status=all&limit=100")
     for item in resp.json()["items"] if resp.ok else []:
         if item["title"].startswith(NAME_PREFIX):
+            # комментарии с задачей не удаляются — иначе копились бы сиротами
+            for comment in comments(page, item["id"]):
+                api_delete(page, f"{COMMENTS}{comment['id']}")
             api_delete(page, f"{API}{item['id']}")
+
+
+COMMENTS = "/api/comments/"
+
+
+def comments(page: Page, task_id: int) -> list:
+    resp = api_get(page, f"{COMMENTS}?entity_type=task&entity_id={task_id}&threaded=false")
+    return resp.json() if resp.ok else []
 
 
 @pytest.fixture
@@ -117,6 +134,7 @@ def set_status(page: Page, task_row, current: str, status: str):
     pick(page, task_row, current, status)
 
 
+# Кейс: Счётчики над списком совпадают с API
 @pytest.mark.smoke
 def test_counters_match_summary(tasks: Page):
     yesterday = dt.date.today() - dt.timedelta(days=1)
@@ -130,6 +148,7 @@ def test_counters_match_summary(tasks: Page):
         expect(counter(tasks, label), label).to_have_text(re.compile(rf"^{data[key]}\s*{label}$"))
 
 
+# Кейс: Создание задачи через форму
 @pytest.mark.writes_data
 def test_create_task_via_form(tasks: Page):
     name = title()
@@ -163,6 +182,7 @@ def test_create_task_via_form(tasks: Page):
     expect(counter(tasks, "Просрочено")).to_have_text(re.compile(rf"^{after['overdue']}\s*Просрочено$"))
 
 
+# Кейс: Задача без названия не создаётся
 def test_empty_title_blocked(tasks: Page):
     posts = []
     tasks.on("request", lambda r: posts.append(r.url) if r.method == "POST" and r.url.endswith(API) else None)
@@ -175,6 +195,7 @@ def test_empty_title_blocked(tasks: Page):
     assert posts == []
 
 
+# Кейс: «Сделана» переносит задачу во вкладку сделанных
 @pytest.mark.writes_data
 def test_done_moves_task_to_done_tab(tasks: Page):
     item = create_task(tasks)
@@ -192,6 +213,7 @@ def test_done_moves_task_to_done_tab(tasks: Page):
     expect(row(tasks, item["title"])).to_have_count(1)
 
 
+# Кейс: Статус «В работе»
 @pytest.mark.writes_data
 def test_in_progress_status(tasks: Page):
     item = create_task(tasks)
@@ -205,6 +227,7 @@ def test_in_progress_status(tasks: Page):
     expect(row(tasks, item["title"]).get_by_role("button", name="В работе", exact=True)).to_be_visible()
 
 
+# Кейс: Повторяющаяся задача порождает следующую
 @pytest.mark.writes_data
 def test_repeating_task_spawns_next(tasks: Page):
     due = dt.date.today() + dt.timedelta(days=3)
@@ -222,6 +245,7 @@ def test_repeating_task_spawns_next(tasks: Page):
     assert task(tasks, item["id"])["status"] == "done"
 
 
+# Кейс: Изменение задачи
 @pytest.mark.writes_data
 def test_edit_task(tasks: Page):
     item = create_task(tasks)
@@ -242,6 +266,7 @@ def test_edit_task(tasks: Page):
     expect(row(tasks, new_name)).to_contain_text("Продажи")
 
 
+# Кейс: Удаление задачи
 @pytest.mark.writes_data
 def test_delete_task(tasks: Page):
     item = create_task(tasks)
@@ -257,6 +282,7 @@ def test_delete_task(tasks: Page):
     assert api_get(tasks, f"{API}{item['id']}").status == 404
 
 
+# Кейс: Удаление задачи можно отменить
 @pytest.mark.writes_data
 def test_delete_can_be_cancelled(tasks: Page):
     item = create_task(tasks)
@@ -269,6 +295,7 @@ def test_delete_can_be_cancelled(tasks: Page):
     assert api_get(tasks, f"{API}{item['id']}").ok
 
 
+# Кейс: Поиск и фильтры
 @pytest.mark.writes_data
 def test_search_and_filters(tasks: Page):
     finance = create_task(tasks, direction="finance")
@@ -293,6 +320,7 @@ def test_search_and_filters(tasks: Page):
     expect(row(tasks, nobody["title"])).to_have_count(0)
 
 
+# Кейс: Чек-лист в карточке задачи
 @pytest.mark.writes_data
 def test_card_checklist(tasks: Page):
     item = create_task(tasks, description="подробности автотеста")
@@ -315,6 +343,42 @@ def test_card_checklist(tasks: Page):
     close_modal(tasks, item["title"])
 
 
+# Кейс: Комментарий в обсуждении задачи
+@pytest.mark.writes_data
+def test_card_comment(tasks: Page):
+    item = create_task(tasks)
+    reload(tasks)
+    row(tasks, item["title"]).get_by_role("button").first.click()
+    card = modal(tasks, item["title"])
+    box = card.get_by_placeholder("Написать по задаче")
+    send = box.locator("xpath=following-sibling::button[1]")
+
+    box.fill("   ")
+    expect(send).to_be_disabled()
+
+    text = f"Комментарий QA {int(time.time())}"
+    with tasks.expect_response(lambda r: r.url.endswith(COMMENTS) and r.request.method == "POST") as posted:
+        box.fill(text)
+        box.press("Enter")
+
+    assert posted.value.status == 201, posted.value.text()
+    assert posted.value.request.post_data_json == {"entity_type": "task", "entity_id": item["id"], "content": text}
+    author = me(tasks)["name"]
+    entry = card.locator("li").filter(has_text=text)
+    expect(entry).to_have_count(1)
+    expect(entry).to_contain_text(re.compile(rf"{re.escape(author)} · \d{{2}}\.\d{{2}}\.\d{{4}}, \d{{2}}:\d{{2}}"))
+    expect(box).to_have_value("")
+    saved = comments(tasks, item["id"])
+    assert [(c["content"], c["author_name"]) for c in saved] == [(text, author)]
+
+    # лента читается с сервера, а не только из памяти формы
+    close_modal(tasks, item["title"])
+    reload(tasks)
+    row(tasks, item["title"]).get_by_role("button").first.click()
+    expect(modal(tasks, item["title"]).locator("li").filter(has_text=text)).to_have_count(1)
+
+
+# Кейс: Файл в карточке задачи
 @pytest.mark.writes_data
 def test_card_file_upload(tasks: Page, tmp_path):
     item = create_task(tasks)
@@ -336,6 +400,7 @@ def test_card_file_upload(tasks: Page, tmp_path):
     assert "qa-autotest.txt" in api_get(tasks, f"{API}{item['id']}/files").text()
 
 
+# Кейс: «С чего начать» следует за задачами
 @pytest.mark.writes_data
 def test_onboarding_checklist_follows_tasks(tasks: Page):
     checklist = api_get(tasks, f"{API}onboarding/checklist").json()

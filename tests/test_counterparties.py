@@ -14,6 +14,17 @@
   в архив? …» (Отмена / Да) → POST …/<id>/archive; в архиве строка с пометкой
   «в архиве» и кнопка «Вернуть из архива» → POST …/<id>/unarchive.
 
+Банковские счета (снято 27.10.2026) — блок в карточке: «Добавить счёт» →
+строчная форма (IBAN или номер счёта, Банк, Код банка (BIC), Валюта) → POST
+…/<id>/bank-accounts → 201; первый счёт сам становится основным («Первый счёт
+станет основным.»), у следующих — галочка «Сделать основным». Кнопки строки —
+иконки с title: «Сделать основным» / «Изменить» → PATCH …/bank-accounts/<id>,
+«Удалить» → окно «Удалить счёт <IBAN>?» → DELETE. Удалили основной — основным
+становится оставшийся. IBAN проверяется по контрольной сумме (400 «IBAN не
+сходится по контрольной сумме — проверьте цифры»), пробелы и регистр
+снимаются, повтор на той же карточке → 409 «Счёт … у этой карточки уже есть»;
+номер без буквы страны (обычный счёт) принимается как есть.
+
 Удаления контрагентов в API нет — свои карточки «QA Autotest …» тесты
 убирают в архив. IDNO у каждой карточки свой (из времени), чтобы архивные
 карточки прошлых прогонов не мешали.
@@ -85,6 +96,7 @@ def find(page: Page, text: str):
         search(page).fill(text)
 
 
+# Кейс: Новая компания-контрагент: карточка и строка в списке
 @pytest.mark.writes_data
 def test_company_create_shows_card_and_row(cp: Page):
     stamp = unique()
@@ -125,6 +137,7 @@ def test_company_create_shows_card_and_row(cp: Page):
     expect(row).to_contain_text(f"qa-{stamp}@example.com · +37369000001")
 
 
+# Кейс: Новое физлицо и фильтр по типу
 @pytest.mark.writes_data
 def test_person_create_and_kind_filter(cp: Page):
     company = create_card(cp)
@@ -153,6 +166,7 @@ def test_person_create_and_kind_filter(cp: Page):
     expect(rows(cp).filter(has_text=name)).to_have_count(0)
 
 
+# Кейс: Повторный IDNO не принимается
 @pytest.mark.writes_data
 def test_duplicate_idno_blocked(cp: Page):
     existing = create_card(cp)
@@ -177,6 +191,7 @@ def test_duplicate_idno_blocked(cp: Page):
     assert [c["id"] for c in same_idno] == [existing["id"]]
 
 
+# Кейс: Поиск по названию и IDNO
 @pytest.mark.writes_data
 def test_search_by_name_and_idno(cp: Page):
     card = create_card(cp, legal_name="QA Search Legal SRL")
@@ -192,6 +207,7 @@ def test_search_by_name_and_idno(cp: Page):
     expect(cp.locator("main").get_by_text("Ничего не нашлось. Попробуйте IDNO или другое написание названия.")).to_be_visible()
 
 
+# Кейс: Изменение карточки контрагента
 @pytest.mark.writes_data
 def test_edit_card(cp: Page):
     card = create_card(cp)
@@ -213,6 +229,7 @@ def test_edit_card(cp: Page):
     assert saved["name"] == new_name and saved["city"] == "Бельцы" and saved["idno"] == card["idno"]
 
 
+# Кейс: В архив и обратно
 @pytest.mark.writes_data
 def test_archive_and_restore(cp: Page):
     card = create_card(cp)
@@ -244,6 +261,7 @@ def test_archive_and_restore(cp: Page):
     expect(rows(cp).filter(has_text=card["name"])).to_have_count(1)
 
 
+# Кейс: Отправку в архив можно отменить
 @pytest.mark.writes_data
 def test_archive_can_be_cancelled(cp: Page):
     card = create_card(cp)
@@ -255,3 +273,142 @@ def test_archive_can_be_cancelled(cp: Page):
 
     expect(modal(cp, card["name"]).get_by_role("button", name="В архив")).to_be_visible()
     assert api_get(cp, f"{API}{card['id']}").json()["archived"] is False
+
+
+# --- Банковские счета -------------------------------------------------------
+
+IBAN_MDL = "MD24AG000225100013104168"
+IBAN_EUR = "MD37VI000000222400100EUR"
+
+
+def open_card(page: Page, card: dict):
+    page.goto(f"/admin/counterparties?id={card['id']}")
+    view = modal(page, card["name"])
+    expect(view.get_by_role("heading", name="Банковские счета")).to_be_visible()
+    settle(page)
+    return view
+
+
+def accounts(view):
+    return view.locator("li")
+
+
+def account(view, iban: str):
+    return accounts(view).filter(has_text=iban)
+
+
+def saved_accounts(page: Page, card: dict) -> dict:
+    return {a["iban"]: a for a in api_get(page, f"{API}{card['id']}").json()["bank_accounts"]}
+
+
+def add_account(page: Page, card: dict, iban: str, **fields):
+    data = {"iban": iban, "bank_name": "", "bank_code": "", "currency": "", "is_main": False, **fields}
+    resp = api_post(page, f"{API}{card['id']}/bank-accounts", data)
+    assert resp.status == 201, resp.text()
+
+
+def is_account_request(method: str, card: dict):
+    return lambda r: f"{API}{card['id']}/bank-accounts" in r.url and r.request.method == method
+
+
+# Кейс: Первый банковский счёт: добавление, становится основным
+@pytest.mark.writes_data
+def test_bank_account_first_becomes_main(cp: Page):
+    card = create_card(cp)
+    view = open_card(cp, card)
+    expect(view.get_by_text("Счетов нет.")).to_be_visible()
+
+    view.get_by_role("button", name="Добавить счёт").click()
+    expect(view.get_by_text("Первый счёт станет основным.")).to_be_visible()
+    expect(view.get_by_role("checkbox", name="Сделать основным")).to_have_count(0)
+    view.get_by_placeholder("IBAN или номер счёта").fill(IBAN_MDL)
+    view.get_by_placeholder("Банк", exact=True).fill("QA Bank")
+    view.get_by_placeholder("Код банка (BIC)").fill("AGRNMD2X")
+    with cp.expect_response(is_account_request("POST", card)) as created:
+        view.get_by_role("button", name="Сохранить").click()
+
+    assert created.value.status == 201, created.value.text()
+    row = account(view, IBAN_MDL)
+    expect(row).to_contain_text("основной")
+    expect(row).to_contain_text("QA Bank · AGRNMD2X")
+    expect(view.get_by_text("Счетов нет.")).to_have_count(0)
+    saved = saved_accounts(cp, card)[IBAN_MDL]
+    assert saved["is_main"] is True and saved["bank_name"] == "QA Bank" and saved["bank_code"] == "AGRNMD2X"
+
+
+# Кейс: IBAN с неверной контрольной суммой не сохраняется
+@pytest.mark.writes_data
+def test_bank_account_bad_checksum_rejected(cp: Page):
+    card = create_card(cp)
+    view = open_card(cp, card)
+    view.get_by_role("button", name="Добавить счёт").click()
+    bad = IBAN_EUR.replace("MD37", "MD11")
+    view.get_by_placeholder("IBAN или номер счёта").fill(bad)
+    with cp.expect_response(is_account_request("POST", card)) as created:
+        view.get_by_role("button", name="Сохранить").click()
+
+    assert created.value.status == 400
+    expect(view.get_by_text("IBAN не сходится по контрольной сумме — проверьте цифры")).to_be_visible()
+    expect(view.get_by_placeholder("IBAN или номер счёта")).to_have_value(bad)
+    assert saved_accounts(cp, card) == {}
+
+
+# Кейс: Повтор счёта на карточке не принимается (пробелы и регистр не помогают)
+@pytest.mark.writes_data
+def test_bank_account_duplicate_rejected(cp: Page):
+    card = create_card(cp)
+    add_account(cp, card, IBAN_MDL)
+    view = open_card(cp, card)
+    view.get_by_role("button", name="Добавить счёт").click()
+    spaced = " ".join(IBAN_MDL.lower()[i:i + 4] for i in range(0, len(IBAN_MDL), 4))
+    view.get_by_placeholder("IBAN или номер счёта").fill(spaced)
+    with cp.expect_response(is_account_request("POST", card)) as created:
+        view.get_by_role("button", name="Сохранить").click()
+
+    assert created.value.status == 409
+    expect(view.get_by_text(f"Счёт {IBAN_MDL} у этой карточки уже есть")).to_be_visible()
+    assert list(saved_accounts(cp, card)) == [IBAN_MDL]
+
+
+# Кейс: Второй счёт: «Сделать основным», правка и удаление основного
+@pytest.mark.writes_data
+def test_bank_account_switch_main_edit_delete(cp: Page):
+    card = create_card(cp)
+    # «первый счёт — основной» решает форма, сервер сам is_main не ставит
+    add_account(cp, card, IBAN_MDL, bank_name="QA Bank", is_main=True)
+    add_account(cp, card, IBAN_EUR, bank_name="QA Bank 2", currency="EUR")
+    view = open_card(cp, card)
+    expect(accounts(view)).to_have_count(2)
+    expect(account(view, IBAN_MDL)).to_contain_text("основной")
+    expect(account(view, IBAN_EUR)).not_to_contain_text("основной")
+    # у основного кнопки «Сделать основным» нет
+    expect(account(view, IBAN_MDL).get_by_role("button", name="Сделать основным")).to_have_count(0)
+
+    with cp.expect_response(is_account_request("PATCH", card)) as made_main:
+        account(view, IBAN_EUR).get_by_role("button", name="Сделать основным").click()
+    assert made_main.value.ok, made_main.value.text()
+    expect(account(view, IBAN_EUR)).to_contain_text("основной")
+    expect(account(view, IBAN_MDL)).not_to_contain_text("основной")
+    saved = saved_accounts(cp, card)
+    assert saved[IBAN_EUR]["is_main"] is True and saved[IBAN_MDL]["is_main"] is False
+
+    account(view, IBAN_MDL).get_by_role("button", name="Изменить").click()
+    view.get_by_placeholder("Банк", exact=True).fill("QA Bank изм.")
+    view.get_by_placeholder("Валюта: MDL").fill("USD")
+    with cp.expect_response(is_account_request("PATCH", card)) as edited:
+        view.get_by_role("button", name="Сохранить").click()
+    assert edited.value.ok, edited.value.text()
+    expect(account(view, IBAN_MDL)).to_contain_text("QA Bank изм.")
+    expect(account(view, IBAN_MDL)).to_contain_text("USD")
+    saved = saved_accounts(cp, card)[IBAN_MDL]
+    assert saved["bank_name"] == "QA Bank изм." and saved["currency"] == "USD" and saved["is_main"] is False
+
+    account(view, IBAN_EUR).get_by_role("button", name="Удалить").click()
+    dialog = cp.get_by_role("dialog", name=f"Удалить счёт {IBAN_EUR}?")
+    with cp.expect_response(is_account_request("DELETE", card)) as deleted:
+        dialog.get_by_role("button", name="Да").click()
+    assert deleted.value.ok, deleted.value.text()
+    expect(accounts(view)).to_have_count(1)
+    expect(account(view, IBAN_MDL)).to_contain_text("основной")
+    saved = saved_accounts(cp, card)
+    assert list(saved) == [IBAN_MDL] and saved[IBAN_MDL]["is_main"] is True

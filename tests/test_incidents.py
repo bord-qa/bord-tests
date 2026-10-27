@@ -19,10 +19,24 @@
 - «Хранилище улик» (/vault) открыто только хранителям — «Стать хранителем»
   тесты не нажимают (это выдача прав).
 
+Снято 27.10.2026:
+- «Изменить» в карточке → окно «Изменить инцидент» с теми же полями →
+  PATCH …/<id> (уходит вся форма);
+- «Импорт архива» → окно «Импорт архива инцидентов», «Выбрать файл .json» →
+  POST …/import {incidents: [...], dry_run: true}: сервер проверяет пачку
+  целиком и окно пишет «В файле: N. Будет заведено: M.»; «Импортировать» —
+  тот же запрос с dry_run=false, над списком «Импорт: заведено M, пропущено
+  уже заведённых K.». Ключ — source_key: повтор пропускается, правки в BORD
+  не перетираются. Одна негодная запись — 400 на всю пачку («Инцидент №2
+  (<key>): Неизвестное значение «тяжесть»: sev9»), «Импортировать» неактивна;
+  не JSON — «Это не файл импорта: нужен JSON со списком incidents.». Статус
+  по умолчанию — «Закрыт». Схема — /api/openapi.json (ImportIncident).
+
 Ведёт инцидент и отвечает за задачи только тест-учётка. Уборка: свои
 «QA Autotest …» удаляем; закрытые сначала возвращаем в «Устранён» (иначе API
 не даёт удалить).
 """
+import json
 import re
 import time
 
@@ -122,6 +136,7 @@ def counter(page: Page, label: str):
     return page.locator("main button").filter(has_text=label)
 
 
+# Кейс: Счётчики над списком совпадают с API
 @pytest.mark.smoke
 def test_counters_match_summary(incidents: Page):
     data = summary(incidents)
@@ -131,6 +146,7 @@ def test_counters_match_summary(incidents: Page):
     expect(counter(incidents, "Безопасность / сбои")).to_contain_text(f"{data['security']} / {data['outage']}")
 
 
+# Кейс: Создание инцидента через форму
 @pytest.mark.writes_data
 def test_create_incident_via_form(incidents: Page):
     name = title()
@@ -171,6 +187,7 @@ def test_create_incident_via_form(incidents: Page):
         before["active"] + 1, before["active_major"] + 1, before["outage"] + 1)
 
 
+# Кейс: Секрет в тексте инцидента не принимается
 @pytest.mark.writes_data
 def test_secret_in_text_rejected(incidents: Page):
     name = title()
@@ -187,6 +204,7 @@ def test_secret_in_text_rejected(incidents: Page):
     assert all(i["title"] != name for i in api_get(incidents, API).json()["items"])
 
 
+# Кейс: Закрыть нельзя, пока не выполнены действия
 @pytest.mark.writes_data
 def test_close_blocked_until_actions_done(incidents: Page):
     item = create_incident(incidents, lead_id=meta(incidents)["me"])
@@ -229,6 +247,7 @@ def test_close_blocked_until_actions_done(incidents: Page):
     expect(incidents.locator("main").get_by_role("button", name="Удалить", exact=True)).to_have_count(0)
 
 
+# Кейс: Закрытый инцидент не удаляется через API
 @pytest.mark.writes_data
 def test_closed_incident_not_deleted_by_api(incidents: Page):
     item = create_incident(incidents)
@@ -241,6 +260,7 @@ def test_closed_incident_not_deleted_by_api(incidents: Page):
     assert incident(incidents, item["id"])["status"] == "closed"
 
 
+# Кейс: Событие в хронологии
 @pytest.mark.writes_data
 def test_timeline_event(incidents: Page):
     item = create_incident(incidents)
@@ -257,6 +277,7 @@ def test_timeline_event(incidents: Page):
     expect(timeline).to_contain_text(f"сообщили клиенту (автотест) — {my_name(incidents)}")
 
 
+# Кейс: Доказательство: SHA проверяется и сохраняется
 @pytest.mark.writes_data
 def test_evidence_sha_checked_and_saved(incidents: Page):
     item = create_incident(incidents)
@@ -284,6 +305,119 @@ def test_evidence_sha_checked_and_saved(incidents: Page):
     expect(incidents.locator("main").get_by_text("qa-logs.7z")).to_be_visible()
 
 
+# Кейс: Изменение инцидента
+@pytest.mark.writes_data
+def test_edit_incident(incidents: Page):
+    item = create_incident(incidents, summary="было")
+    open_card(incidents, item)
+    new_title = f"{item['title']} изм."
+
+    incidents.locator("main").get_by_role("button", name="Изменить", exact=True).click()
+    form = modal(incidents, "Изменить инцидент")
+    expect(field(form, "Название")).to_have_value(item["title"])
+    expect(field(form, "Что случилось")).to_have_value("было")
+    field(form, "Название").fill(new_title)
+    pick(incidents, form, "SEV4 — мелкий", "SEV2 — серьёзный")
+    field(form, "Клиент").fill("QA клиент")
+    field(form, "Причина").fill("причина автотеста")
+    with incidents.expect_response(lambda r: r.url.endswith(f"{API}/{item['id']}") and r.request.method == "PATCH") as patched:
+        form.get_by_role("button", name="Сохранить").click()
+
+    assert patched.value.ok, patched.value.text()
+    expect(form).to_have_count(0)
+    main = incidents.locator("main")
+    for text in (new_title, "SEV2 — серьёзный", "QA клиент", "причина автотеста", "было"):
+        expect(main, text).to_contain_text(text)
+    saved = incident(incidents, item["id"])
+    assert (saved["title"], saved["severity"], saved["client"], saved["root_cause"], saved["summary"]) == (
+        new_title, "sev2", "QA клиент", "причина автотеста", "было")
+    assert saved["status"] == "open"
+
+
+def import_file(tmp_path, name: str, body) -> str:
+    path = tmp_path / name
+    path.write_text(body if isinstance(body, str) else json.dumps(body, ensure_ascii=False), encoding="utf-8")
+    return str(path)
+
+
+def open_import(page: Page):
+    page.locator("main").get_by_role("button", name="Импорт архива").click()
+    return modal(page, "Импорт архива инцидентов")
+
+
+def is_import(r) -> bool:
+    return r.url.endswith(f"{API}/import") and r.request.method == "POST"
+
+
+# Кейс: Импорт архива: проверка, заведение и повтор без дублей
+@pytest.mark.writes_data
+def test_import_archive(incidents: Page, tmp_path):
+    stamp = int(time.time() * 1000)
+    closed = {"source_key": f"qa-{stamp}-1", "title": f"{NAME_PREFIX} импорт {stamp} закрытый", "severity": "sev4"}
+    resolved = {"source_key": f"qa-{stamp}-2", "title": f"{NAME_PREFIX} импорт {stamp} устранён",
+                "status": "resolved", "kind": "outage", "severity": "sev2"}
+    file = import_file(tmp_path, "archive.json", {"incidents": [closed, resolved]})
+
+    dialog = open_import(incidents)
+    expect(dialog.get_by_role("button", name="Импортировать")).to_be_disabled()
+    with incidents.expect_response(is_import) as checked:
+        dialog.locator("input[type=file]").set_input_files(file)
+    assert checked.value.json()["dry_run"] is True
+    expect(dialog).to_contain_text("В файле: 2. Будет заведено: 2.")
+    # проверка ничего не заводит
+    assert not [i for i in api_get(incidents, API).json()["items"] if str(stamp) in i["title"]]
+
+    with incidents.expect_response(is_import) as imported:
+        dialog.get_by_role("button", name="Импортировать").click()
+    assert imported.value.ok and imported.value.request.post_data_json["dry_run"] is False
+    expect(dialog).to_have_count(0)
+    main = incidents.locator("main")
+    expect(main.get_by_text("Импорт: заведено 2, пропущено уже заведённых 0.")).to_be_visible()
+    rows = main.locator("table tbody tr")
+    expect(rows.filter(has_text=closed["title"])).to_contain_text("Закрыт")
+    expect(rows.filter(has_text=closed["title"])).to_contain_text("SEV4 — мелкий")
+    expect(rows.filter(has_text=resolved["title"])).to_contain_text("Устранён")
+    expect(rows.filter(has_text=resolved["title"])).to_contain_text("SEV2 — серьёзный")
+
+    # повтор: запись с тем же ключом пропускается и не перетирается
+    changed = {**closed, "title": f"{closed['title']} перетёрт"}
+    third = {"source_key": f"qa-{stamp}-3", "title": f"{NAME_PREFIX} импорт {stamp} новый"}
+    file = import_file(tmp_path, "again.json", {"incidents": [changed, third]})
+    dialog = open_import(incidents)
+    with incidents.expect_response(is_import):
+        dialog.locator("input[type=file]").set_input_files(file)
+    expect(dialog).to_contain_text("В файле: 2. Будет заведено: 1, уже есть: 1.")
+    with incidents.expect_response(is_import):
+        dialog.get_by_role("button", name="Импортировать").click()
+    expect(main.get_by_text("Импорт: заведено 1, пропущено уже заведённых 1.")).to_be_visible()
+    titles = sorted(i["title"] for i in api_get(incidents, API).json()["items"] if str(stamp) in i["title"])
+    assert titles == sorted([closed["title"], resolved["title"], third["title"]])
+
+
+# Кейс: Импорт архива: негодный файл не заводит ничего
+@pytest.mark.writes_data
+def test_import_archive_rejects_bad_file(incidents: Page, tmp_path):
+    stamp = int(time.time() * 1000)
+    good = {"source_key": f"qa-{stamp}-ok", "title": f"{NAME_PREFIX} импорт {stamp} годный"}
+    bad = {"source_key": f"qa-{stamp}-bad", "title": f"{NAME_PREFIX} импорт {stamp} негодный", "severity": "sev9"}
+    dialog = open_import(incidents)
+
+    with incidents.expect_response(is_import) as checked:
+        dialog.locator("input[type=file]").set_input_files(import_file(tmp_path, "bad.json", {"incidents": [good, bad]}))
+    assert checked.value.status == 400
+    expect(dialog).to_contain_text(f"Инцидент №2 ({bad['source_key']}): Неизвестное значение «тяжесть»: sev9")
+    expect(dialog.get_by_role("button", name="Импортировать")).to_be_disabled()
+
+    dialog.locator("input[type=file]").set_input_files(import_file(tmp_path, "broken.json", "not json"))
+    expect(dialog).to_contain_text("Это не файл импорта: нужен JSON со списком incidents.")
+    expect(dialog.get_by_role("button", name="Импортировать")).to_be_disabled()
+
+    dialog.get_by_role("button", name="Отмена").click()
+    expect(dialog).to_have_count(0)
+    assert not [i for i in api_get(incidents, API).json()["items"] if str(stamp) in i["title"]]
+
+
+# Кейс: Удаление открытого инцидента
 @pytest.mark.writes_data
 def test_delete_open_incident(incidents: Page):
     item = create_incident(incidents)
@@ -298,6 +432,7 @@ def test_delete_open_incident(incidents: Page):
     assert api_get(incidents, f"{API}/{item['id']}").status == 404
 
 
+# Кейс: Фильтры и поиск в списке
 @pytest.mark.writes_data
 def test_list_filters_and_search(incidents: Page):
     sec = create_incident(incidents, kind="security", severity="sev1")
@@ -325,6 +460,7 @@ def test_list_filters_and_search(incidents: Page):
     expect(incidents).to_have_url(re.compile(rf"\?id={out['id']}$"))
 
 
+# Кейс: Хранилище — только для хранителей
 def test_vault_only_for_custodians(incidents: Page):
     incidents.goto("/admin/security/incidents/vault")
 

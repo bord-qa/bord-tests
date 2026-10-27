@@ -17,9 +17,28 @@
 - встроенная система «BORD» (builtin) ведётся сама: её доступы — участники
   организации, тесты её не трогают.
 
-Ответственный и владелец доступа в тестах — только тест-учётка. Уборка:
+Снято 27.10.2026 (вкладки открываются и по адресу ?tab=offboardings|rotations):
+- «Увольнения» (Идут / Закрытые → ?state=open|done): «Начать увольнение» →
+  окно: Сотрудник (по умолчанию «— не сотрудник BORD (подрядчик) —»), Имя
+  («как записан в реестре»), Причина → POST …/offboardings → 201. Карточка:
+  «Живые доступы: N» с кнопкой «Отозван» у каждого (сразу, без окна), задачи
+  «Увольнение: <имя>» (протокол, 8 пунктов, себе) и «Отозвать доступы: <имя>»
+  (владельцу системы, пункт на доступ — галочка ставится сама при отзыве),
+  «Закрыть увольнение» → POST …/<id>/complete (задачи остаются открытыми).
+  Удаления увольнений в API нет — закрытые копятся в «Закрытых».
+  «Заблокировать везде» (lockout: Google, сейф, учётка BORD) тесты НЕ нажимают;
+- «Смена паролей»: «Общие логины» — логин, по которому больше одного
+  действующего доступа; ушёл один из них — логин в «Пароли, которые надо
+  сменить» с «Новый пароль сообщить: <остальные>»; «Сменил» → окно «Пароль
+  сменён» с комментарием → POST …/rotations/done {kind: login, system_id,
+  login, note} — закрывает только этот логин. ecom-100215: комментарий вида
+  «пароль: …» принимается (в инцидентах — 400).
+
+Ответственный и владелец доступа в тестах — только тест-учётка; уволить
+можно только подрядчика (живых сотрудников BORD QA не трогаем). Уборка:
 пустые системы «QA Autotest …» удаляются, у систем с доступами доступы
-отзываются, а сама система уходит в архив (удалить её API не даёт).
+отзываются, а сама система уходит в архив (удалить её API не даёт); задачи,
+которые поставило увольнение подрядчика «QA Autotest …», удаляются.
 """
 import datetime as dt
 import re
@@ -101,6 +120,11 @@ def cleanup(page: Page):
                 api_post(page, f"{API}grants/{grant['id']}/revoke", {"note": "уборка автотеста"})
             if not system["archived"]:
                 api_patch(page, f"{API}systems/{system['id']}", {"archived": True})
+    # «Увольнение: QA Autotest …», «Отозвать доступы: QA Autotest …»
+    resp = api_get(page, "/api/tasks/?status=all&limit=100")
+    for task in resp.json()["items"] if resp.ok else []:
+        if f": {NAME_PREFIX}" in task["title"]:
+            api_delete(page, f"/api/tasks/{task['id']}")
 
 
 @pytest.fixture
@@ -119,7 +143,9 @@ def reload(page: Page):
 
 
 def tab(page: Page, label: str):
-    return page.locator("main").get_by_role("button", name=label, exact=True)
+    # у вкладок бывает счётчик в имени: «Смена паролей1», «Увольнения1» (без re.escape —
+    # регулярка уходит в JS, а в подписях только буквы и пробелы)
+    return page.locator("main").get_by_role("button", name=re.compile(rf"^{label}\d*$"))
 
 
 def counter(page: Page, label: str):
@@ -150,6 +176,7 @@ def open_systems(page: Page):
     expect(page.locator("main").get_by_role("button", name="Добавить систему")).to_be_visible()
 
 
+# Кейс: Счётчики над списком совпадают с API
 @pytest.mark.smoke
 def test_counters_match_summary(security: Page):
     data = summary(security)
@@ -158,6 +185,7 @@ def test_counters_match_summary(security: Page):
         expect(counter(security, label), label).to_have_text(re.compile(rf"^{data[key]}\s*{label}$"))
 
 
+# Кейс: Встроенная система «BORD» показывает участников организации
 def test_builtin_bord_system_lists_org_members(security: Page):
     """Встроенная «BORD» = участники организации, «авто», со ссылкой в «Пользователи»."""
     users = api_get(security, "/api/admin/auth/users").json()
@@ -171,6 +199,7 @@ def test_builtin_bord_system_lists_org_members(security: Page):
         expect(line.get_by_role("link", name="в «Пользователях»")).to_have_attribute("href", "/admin/users")
 
 
+# Кейс: Добавление системы через форму
 @pytest.mark.writes_data
 def test_add_system_via_form(security: Page):
     before = summary(security)
@@ -205,6 +234,7 @@ def test_add_system_via_form(security: Page):
         re.compile(rf"^{after['systems_without_owner']}\s*Систем без ответственного$"))
 
 
+# Кейс: Назначение владельца закрывает риск
 @pytest.mark.writes_data
 def test_assign_owner_closes_risk(security: Page):
     system = create_system(security)
@@ -222,6 +252,7 @@ def test_assign_owner_closes_risk(security: Page):
     assert summary(security)["systems_without_owner"] == before["systems_without_owner"] - 1
 
 
+# Кейс: Выдать доступ и отозвать
 @pytest.mark.writes_data
 def test_grant_access_and_revoke(security: Page):
     system = create_system(security)
@@ -264,6 +295,7 @@ def test_grant_access_and_revoke(security: Page):
     expect(rows(security, system["name"])).to_contain_text(f"отозван {dt.date.today():%d.%m.%Y}")
 
 
+# Кейс: Отзыв доступа можно отменить
 @pytest.mark.writes_data
 def test_revoke_can_be_cancelled(security: Page):
     system = create_system(security)
@@ -277,6 +309,7 @@ def test_revoke_can_be_cancelled(security: Page):
     assert grants_of(security, system["id"], "active")[0]["id"] == grant["id"]
 
 
+# Кейс: Доступ подрядчику
 @pytest.mark.writes_data
 def test_contractor_grant(security: Page):
     system = create_system(security)
@@ -297,6 +330,7 @@ def test_contractor_grant(security: Page):
     expect(rows(security, system["name"])).to_contain_text(contractor)
 
 
+# Кейс: Счётчики рисков следуют за доступами
 @pytest.mark.writes_data
 def test_risk_counters_follow_grants(security: Page):
     """Истёкший доступ → «Истёк, не отозван», без 2FA в критичной системе → «Без 2FA в критичных»."""
@@ -316,6 +350,7 @@ def test_risk_counters_follow_grants(security: Page):
     expect(expired).to_have_count(1)
 
 
+# Кейс: Поиск по доступам
 @pytest.mark.writes_data
 def test_search_grants(security: Page):
     system = create_system(security)
@@ -331,6 +366,7 @@ def test_search_grants(security: Page):
     expect(rows(security, "turcan.maxim@alsodev.com")).to_have_count(1)
 
 
+# Кейс: Система в архив и обратно
 @pytest.mark.writes_data
 def test_archive_and_restore_system(security: Page):
     system = create_system(security)
@@ -352,6 +388,7 @@ def test_archive_and_restore_system(security: Page):
     expect(rows(security, system["name"])).to_have_count(1)
 
 
+# Кейс: Удаление системы без доступов
 @pytest.mark.writes_data
 def test_delete_empty_system(security: Page):
     system = create_system(security)
@@ -369,6 +406,7 @@ def test_delete_empty_system(security: Page):
     assert system["name"] not in names
 
 
+# Кейс: Систему с доступами удалить нельзя
 @pytest.mark.writes_data
 def test_system_with_grants_cannot_be_deleted(security: Page):
     system = create_system(security)
@@ -386,6 +424,7 @@ def test_system_with_grants_cannot_be_deleted(security: Page):
     expect(rows(security, system["name"])).to_have_count(1)
 
 
+# Кейс: Вкладка реестра открывается
 @pytest.mark.parametrize("label", TAB_API)
 def test_tab_opens(security: Page, label):
     with security.expect_response(lambda r: f"{API}{TAB_API[label]}" in r.url) as loaded:
@@ -393,3 +432,142 @@ def test_tab_opens(security: Page, label):
 
     assert loaded.value.ok, f"{label}: {loaded.value.status}"
     expect(security.locator("main").get_by_text("Ошибка 500")).to_have_count(0)
+
+
+# --- Увольнения и смена паролей -------------------------------------------
+
+SECRET_BUG = "ecom-100215: комментарий «Сменил» принимает «пароль: …» и хранит его"
+
+
+def contractor(tag: str) -> str:
+    return f"{NAME_PREFIX} Подрядчик {tag} {int(time.time() * 1000)}"
+
+
+def shared_login_system(page: Page) -> tuple[dict, str, str, str]:
+    """Система тест-учётки и общий логин у двух подрядчиков."""
+    system = create_system(page, owner_id=me(page))
+    login = f"shared-{int(time.time() * 1000)}@example.com"
+    first, second = contractor("A"), contractor("B")
+    for holder in (first, second):
+        create_grant(page, system, holder_id=None, holder_name=holder, login=login)
+    return system, login, first, second
+
+
+def open_tab(page: Page, key: str):
+    page.goto(f"/admin/security?tab={key}")
+    settle(page)
+
+
+def offboarding_card(page: Page, holder: str):
+    return page.locator("main div").filter(has=page.get_by_text(holder, exact=True)).filter(
+        has=page.get_by_role("heading", name="Задачи")).last
+
+
+def rotation_row(page: Page, login: str):
+    return page.locator("main div").filter(has_text=f"логин {login}").filter(
+        has=page.get_by_role("button", name="Сменил")).last
+
+
+def revoke_via_api(page: Page, system: dict, holder: str):
+    grant = next(g for g in grants_of(page, system["id"], "active") if g["holder_name"] == holder)
+    assert api_post(page, f"{API}grants/{grant['id']}/revoke", {"note": "автотест"}).ok
+
+
+# Кейс: Увольнение подрядчика: задачи, отзыв доступа, закрытие
+@pytest.mark.writes_data
+def test_offboarding_contractor(security: Page):
+    system, login, leaving, _ = shared_login_system(security)
+    open_tab(security, "offboardings")
+    main = security.locator("main")
+
+    main.get_by_role("button", name="Начать увольнение").click()
+    form = modal(security, "Начать увольнение")
+    expect(form.get_by_role("button", name="— не сотрудник BORD (подрядчик) —")).to_be_visible()
+    form.get_by_text("Имя", exact=True).locator("xpath=following-sibling::input[1]").fill(leaving)
+    form.locator("textarea").fill("уход автотеста")
+    with security.expect_response(lambda r: r.url.endswith(f"{API}offboardings") and r.request.method == "POST") as started:
+        form.get_by_role("button", name="Сохранить").click()
+
+    assert started.value.status == 201, started.value.text()
+    card = offboarding_card(security, leaving)
+    expect(card.get_by_role("heading", name="Живые доступы: 1")).to_be_visible()
+    expect(card).to_contain_text(system["name"])
+    expect(card).to_contain_text("уход автотеста")
+    protocol = card.get_by_role("link", name=re.compile(f"^Увольнение: {re.escape(leaving)}"))
+    revoke_task = card.get_by_role("link", name=re.compile(f"^Отозвать доступы: {re.escape(leaving)}"))
+    expect(protocol).to_contain_text(re.compile(r"0/\d+ · Новая"))
+    expect(revoke_task).to_contain_text("0/1 · Новая")
+
+    with security.expect_response(lambda r: "/revoke" in r.url and r.request.method == "POST") as revoked:
+        card.get_by_role("button", name="Отозван").click()
+    assert revoked.value.ok, revoked.value.text()
+    expect(card.get_by_text("Живых доступов нет")).to_be_visible()
+    expect(revoke_task).to_contain_text("1/1")
+    assert [g["holder_name"] for g in grants_of(security, system["id"], "active")] != [] and all(
+        g["holder_name"] != leaving for g in grants_of(security, system["id"], "active"))
+
+    with security.expect_response(lambda r: r.url.endswith("/complete") and r.request.method == "POST") as completed:
+        card.get_by_role("button", name="Закрыть увольнение").click()
+    assert completed.value.ok, completed.value.text()
+    expect(main.get_by_text(leaving, exact=True)).to_have_count(0)
+    # сразу после закрытия список перечитывается и клик может потеряться — ждём сам запрос
+    with security.expect_response(lambda r: "offboardings?state=done" in r.url):
+        main.get_by_role("button", name="Закрытые", exact=True).click()
+    # у закрытой карточки задачи без заголовка-роли — ищем по имени и пометке
+    closed = main.locator("div").filter(has=security.get_by_text(leaving, exact=True)).filter(
+        has=security.get_by_text("закрыто", exact=True)).last
+    expect(closed).to_be_visible()
+    expect(closed).to_contain_text(f"закрыл {my_name(security)}")
+
+
+# Кейс: Общий логин: ушёл один — пароль в «надо сменить», «Сменил» закрывает
+@pytest.mark.writes_data
+def test_shared_login_rotation(security: Page):
+    system, login, leaving, staying = shared_login_system(security)
+    open_tab(security, "rotations")
+    shared = security.locator("main table tbody tr").filter(has_text=login)
+    expect(shared).to_contain_text(system["name"])
+    expect(shared).to_contain_text(leaving)
+    expect(shared).to_contain_text(staying)
+    expect(rotation_row(security, login)).to_have_count(0)
+
+    revoke_via_api(security, system, leaving)
+    open_tab(security, "rotations")
+    row = rotation_row(security, login)
+    expect(row).to_contain_text(f"{leaving}: доступ отозван")
+    expect(row).to_contain_text(f"Новый пароль сообщить: {staying}")
+    expect(shared).to_have_count(0)
+
+    row.get_by_role("button", name="Сменил").click()
+    dialog = modal(security, "Пароль сменён")
+    expect(dialog).to_contain_text(f"пароль логина {login} в «{system['name']}»")
+    dialog.locator("textarea, input").first.fill("сменили, новый в сейфе")
+    with security.expect_response(lambda r: r.url.endswith(f"{API}rotations/done")) as done:
+        dialog.get_by_role("button", name="Сохранить").click()
+
+    assert done.value.ok, done.value.text()
+    sent = done.value.request.post_data_json
+    assert (sent["kind"], sent["system_id"], sent["login"]) == ("login", system["id"], login)
+    expect(rotation_row(security, login)).to_have_count(0)
+    left = api_get(security, f"{API}rotations").json()["to_rotate"]
+    assert all(item.get("login") != login for item in left)
+
+
+# Кейс: Пароль в комментарии «Сменил» не принимается
+@pytest.mark.writes_data
+def test_rotation_note_rejects_secret(security: Page):
+    system, login, leaving, _ = shared_login_system(security)
+    revoke_via_api(security, system, leaving)
+    open_tab(security, "rotations")
+
+    rotation_row(security, login).get_by_role("button", name="Сменил").click()
+    dialog = modal(security, "Пароль сменён")
+    dialog.locator("textarea, input").first.fill("пароль: Qa-Fake-123!")
+    with security.expect_response(lambda r: r.url.endswith(f"{API}rotations/done")) as done:
+        dialog.get_by_role("button", name="Сохранить").click()
+
+    if done.value.ok:
+        pytest.xfail(SECRET_BUG)
+    assert done.value.status == 400
+    expect(dialog).to_contain_text("похоже на секрет")
+    expect(rotation_row(security, login)).to_have_count(1)

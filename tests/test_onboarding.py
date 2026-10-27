@@ -1,0 +1,149 @@
+"""Блок 18. Мастер первой настройки: app.bord.one/admin/onboarding.
+
+Снято 27.10.2026:
+- над мастером — блок «Настроить с ИИ» с адресом https://app.bord.one/mcp;
+- шаги-кнопки «1. Компания» / «2. Команда»;
+- «1. Компания» — те же поля и тот же API, что «Настройки → Компания»
+  (GET /api/onboarding, «Сохранить и дальше» → PUT /api/onboarding/company,
+  уходят все поля формы) → переход на «2. Команда»; «Пропустить и перейти к
+  модулям» → /admin/subscription;
+- «2. Команда» — строки «email@компания.md» + роль + «Доступ к модулям: N из
+  M» + «Убрать»; «Ещё коллега» добавляет строку; «Отправить приглашения» →
+  POST /api/admin/auth/invites на каждую строку (note «Приглашение из первой
+  настройки»), отправленная строка блокируется с зелёной галочкой;
+  «Дальше — выбрать модули» → /admin/subscription.
+
+Настоящие адреса в «Команду» не вводим — придёт письмо. ecom-100214: адрес
+не проверяется ни формой, ни сервером — «not-an-email» становится рабочим
+приглашением с галочкой «отправлено». Тест на это — xfail, созданное
+приглашение отзываем. Реквизиты общие на организацию — фикстура возвращает их.
+"""
+import time
+
+import pytest
+from playwright.sync_api import Page, expect
+
+from helpers.api import api_delete, api_get, api_put
+from helpers.wait import settle
+
+pytestmark = pytest.mark.requires_auth
+
+ONBOARDING = "/api/onboarding"
+SAVE = "/api/onboarding/company"
+INVITES = "/api/admin/auth/invites"
+FIELDS = ("name", "industry", "legal_name", "idno", "vat_code", "address", "phone")
+BAD_EMAIL_PREFIX = "qa-autotest-no-at-"
+EMAIL_BUG = "ecom-100214: приглашение создаётся на строку без «@», мастер ставит галочку «отправлено»"
+
+
+def company(page: Page) -> dict:
+    resp = api_get(page, ONBOARDING)
+    assert resp.ok, f"{ONBOARDING} → {resp.status}"
+    return resp.json()["company"]
+
+
+def revoke_bad_invites(page: Page):
+    resp = api_get(page, INVITES)
+    for inv in resp.json() if resp.ok else []:
+        if (inv.get("email") or "").startswith(BAD_EMAIL_PREFIX):
+            api_delete(page, f"{INVITES}/{inv['code']}")
+
+
+@pytest.fixture
+def wizard(auth_page: Page):
+    auth_page.goto("/admin/onboarding")
+    expect(auth_page).to_have_title("Настройка компании — BORD")
+    expect(step(auth_page, "1. Компания")).to_be_visible()
+    settle(auth_page)
+    before = company(auth_page)
+    yield auth_page
+    revoke_bad_invites(auth_page)
+    if company(auth_page) != before:
+        restored = api_put(auth_page, SAVE, {k: before.get(k) or "" for k in FIELDS})
+        assert restored.ok, f"не удалось вернуть реквизиты: {restored.status} {restored.text()}"
+
+
+def step(page: Page, name: str):
+    return page.locator("main").get_by_role("button", name=name, exact=True)
+
+
+def field(page: Page, label: str):
+    return page.locator("main").get_by_text(label, exact=True).locator("xpath=following-sibling::input[1]")
+
+
+def email_rows(page: Page):
+    return page.locator("main").get_by_placeholder("email@компания.md")
+
+
+def open_team(page: Page):
+    step(page, "2. Команда").click()
+    expect(page.locator("main").get_by_text("Пригласите коллег", exact=False)).to_be_visible()
+
+
+# Кейс: Шаг «Компания» показывает реквизиты из API и ведёт на «Команду»
+@pytest.mark.writes_data
+def test_company_step_matches_api_and_goes_next(wizard: Page):
+    data = company(wizard)
+    main = wizard.locator("main")
+    expect(main.locator("code", has_text="https://app.bord.one/mcp")).to_be_visible()
+    expect(field(wizard, "Название в BORD *")).to_have_value(data["name"])
+    expect(main.get_by_placeholder("Exemplu SRL")).to_have_value(data["legal_name"] or "")
+    expect(main.get_by_placeholder("13 цифр")).to_have_value(data["idno"] or "")
+    expect(field(wizard, "Код НДС")).to_have_value(data["vat_code"] or "")
+    expect(field(wizard, "Адрес")).to_have_value(data["address"] or "")
+    expect(main.get_by_placeholder("+373 …")).to_have_value(data["phone"] or "")
+
+    with wizard.expect_response(lambda r: r.url.endswith(SAVE) and r.request.method == "PUT") as saved:
+        main.get_by_role("button", name="Сохранить и дальше").click()
+
+    assert saved.value.ok, saved.value.text()
+    assert saved.value.request.post_data_json["name"] == data["name"]
+    expect(main.get_by_text("Пригласите коллег", exact=False)).to_be_visible()
+    expect(main.get_by_role("button", name="Отправить приглашения")).to_be_visible()
+    # без правок реквизиты не меняются
+    assert company(wizard) == data
+
+
+# Кейс: «Пропустить» и «Дальше» ведут к модулям
+@pytest.mark.parametrize("button", ["Пропустить и перейти к модулям", "Дальше — выбрать модули"])
+def test_skip_buttons_lead_to_modules(wizard: Page, button: str):
+    if button.startswith("Дальше"):
+        open_team(wizard)
+    wizard.locator("main").get_by_role("button", name=button).click()
+    expect(wizard).to_have_url("https://app.bord.one/admin/subscription")
+    expect(wizard).to_have_title("Модули и оплата — BORD")
+
+
+# Кейс: «Ещё коллега» добавляет строку, «Убрать» убирает
+def test_team_rows_add_and_remove(wizard: Page):
+    open_team(wizard)
+    main = wizard.locator("main")
+    expect(email_rows(wizard)).to_have_count(1)
+    expect(main.get_by_text("Доступ к модулям:", exact=False)).to_have_count(1)
+
+    main.get_by_role("button", name="Ещё коллега").click()
+    expect(email_rows(wizard)).to_have_count(2)
+    email_rows(wizard).nth(1).fill("второй")
+    main.get_by_role("button", name="Убрать").first.click()
+
+    expect(email_rows(wizard)).to_have_count(1)
+    expect(email_rows(wizard).first).to_have_value("второй")
+
+
+# Кейс: Строка без «@» не становится приглашением
+@pytest.mark.writes_data
+def test_invalid_email_not_invited(wizard: Page):
+    open_team(wizard)
+    bad = f"{BAD_EMAIL_PREFIX}{int(time.time() * 1000)}"
+    sent = []
+    wizard.on("request", lambda r: sent.append(r) if r.url.endswith(INVITES) and r.method == "POST" else None)
+    email_rows(wizard).first.fill(bad)
+    wizard.locator("main").get_by_role("button", name="Отправить приглашения").click()
+    # отсутствие запроса не дождаться событием — даём форме время на ответ
+    wizard.wait_for_timeout(2000)
+
+    created = [i for i in api_get(wizard, INVITES).json() if i.get("email") == bad]
+    if created:
+        pytest.xfail(EMAIL_BUG)
+    assert not sent or all(r.response() and not r.response().ok for r in sent)
+    expect(email_rows(wizard).first).to_be_enabled()
