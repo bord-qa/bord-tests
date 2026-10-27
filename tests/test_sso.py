@@ -24,6 +24,7 @@ def ids(url: str) -> str:
     return url.removeprefix("https://").removesuffix("/admin")
 
 
+# Кейс: Система открывается без повторного пароля
 @pytest.mark.smoke
 @pytest.mark.parametrize("url", SYSTEMS, ids=[ids(u) for u in SYSTEMS])
 def test_system_opens_without_password(auth_page: Page, url):
@@ -40,6 +41,7 @@ def test_system_opens_without_password(auth_page: Page, url):
     expect(auth_page.locator("text=BORD QA >> visible=true").first).to_be_visible(timeout=15_000)
 
 
+# Кейс: Гость не получает данных
 def test_guest_gets_no_data(browser: Browser, browser_context_args):
     """Без сессии BORD система данных не показывает — просит войти."""
     guest = browser.new_context(**{k: v for k, v in browser_context_args.items() if k != "storage_state"}).new_page()

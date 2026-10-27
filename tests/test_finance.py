@@ -48,6 +48,7 @@ def goto(page: Page, path: str, api: str):
     return resp.value.json()
 
 
+# Кейс: Обзор финансов совпадает с API
 def test_overview_matches_api(auth_page: Page):
     home = goto(auth_page, "/admin/finance", "home")
     main = auth_page.locator("main")
@@ -66,6 +67,7 @@ def test_overview_matches_api(auth_page: Page):
     expect(auth_page.get_by_role("link", name="Открыть facturi")).to_have_attribute("href", home["app_url"])
 
 
+# Кейс: Крупнейшие должники в обзоре
 def test_overview_top_debtors(auth_page: Page):
     goto(auth_page, "/admin/finance", "home")
     debtors = api_get(auth_page, f"{API}debtors?side=receivable&limit=5").json()
@@ -80,6 +82,7 @@ def test_overview_top_debtors(auth_page: Page):
     expect(auth_page.locator("main").get_by_role("link", name="Документы и оплаты")).to_have_attribute("href", "/admin/finance/invoices")
 
 
+# Кейс: Счета открываются на «Нам должны»
 @pytest.mark.smoke
 def test_invoices_open_receivable_by_default(auth_page: Page):
     with auth_page.expect_request(lambda r: f"{API}invoices" in r.url) as first:
@@ -97,6 +100,7 @@ def test_invoices_open_receivable_by_default(auth_page: Page):
     expect(header(auth_page).get_by_role("link", name="К обзору финансов")).to_have_attribute("href", "/admin/finance")
 
 
+# Кейс: Фильтры счетов уходят в API
 def test_invoices_filters_hit_api(auth_page: Page):
     goto(auth_page, "/admin/finance/invoices", "invoices")
     bar = header(auth_page)
@@ -122,6 +126,7 @@ def test_invoices_filters_hit_api(auth_page: Page):
     expect(auth_page.locator("main").get_by_text("Документов нет.")).to_be_visible()
 
 
+# Кейс: Должники по обе стороны совпадают с API
 @pytest.mark.parametrize(
     ("label", "side", "other", "empty"),
     [("Нам должны", "receivable", "Мы должны", "Никто не должен."),

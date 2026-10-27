@@ -134,6 +134,7 @@ def pick_source(page: Page, form, src: dict):
     page.get_by_role("option", name=src["name"], exact=True).click()
 
 
+# Кейс: Счётчики над списком совпадают с API
 @pytest.mark.smoke
 def test_counters_match_summary(dom: Page):
     data = summary(dom)
@@ -142,6 +143,7 @@ def test_counters_match_summary(dom: Page):
         expect(counter(dom, label), label).to_have_text(re.compile(rf"^{data[key]}\s*{re.escape(label)}$"))
 
 
+# Кейс: Создание ручного источника
 @pytest.mark.writes_data
 def test_manual_source_create(dom: Page):
     name = f"{SOURCE_PREFIX} источник {stamp()}"
@@ -163,6 +165,7 @@ def test_manual_source_create(dom: Page):
     expect(card.get_by_role("button", name="Импорт списка")).to_be_visible()
 
 
+# Кейс: Добавление домена через форму
 @pytest.mark.writes_data
 def test_add_domain_via_form(dom: Page, source):
     reload(dom)
@@ -202,6 +205,7 @@ def test_add_domain_via_form(dom: Page, source):
     assert (after["total"], after["upcoming"], after["manual"]) == (before["total"] + 1, before["upcoming"] + 1, before["manual"] + 1)
 
 
+# Кейс: Состояние домена в строке совпадает с API
 @pytest.mark.writes_data
 def test_domain_states(dom: Page, source):
     """Состояние в строке = state_label из API; прошедший срок и «не указан» — однозначно."""
@@ -219,6 +223,7 @@ def test_domain_states(dom: Page, source):
     expect(counter(dom, "Срок прошёл")).to_have_text(re.compile(rf"^{after['expired']}\s*Срок прошёл$"))
 
 
+# Кейс: «Продлён» добавляет год к сроку
 @pytest.mark.writes_data
 def test_mark_renewed_adds_year(dom: Page, source):
     item = create_domain(dom, source, days=10)
@@ -236,6 +241,7 @@ def test_mark_renewed_adds_year(dom: Page, source):
     expect(row(dom, item["name"])).not_to_contain_text("Скоро продлевать")
 
 
+# Кейс: Изменение домена
 @pytest.mark.writes_data
 def test_edit_domain(dom: Page, source):
     item = create_domain(dom, source, days=None)
@@ -255,6 +261,7 @@ def test_edit_domain(dom: Page, source):
     expect(row(dom, item["name"])).to_contain_text(ru(new_date))
 
 
+# Кейс: Удаление домена
 @pytest.mark.writes_data
 def test_remove_domain(dom: Page, source):
     item = create_domain(dom, source)
@@ -270,6 +277,7 @@ def test_remove_domain(dom: Page, source):
     assert find_domain(dom, item["name"]) is None
 
 
+# Кейс: Удаление домена можно отменить
 @pytest.mark.writes_data
 def test_remove_can_be_cancelled(dom: Page, source):
     item = create_domain(dom, source)
@@ -282,6 +290,7 @@ def test_remove_can_be_cancelled(dom: Page, source):
     assert find_domain(dom, item["name"])
 
 
+# Кейс: Импорт списка доменов
 @pytest.mark.writes_data
 def test_import_list(dom: Page, source):
     existing = create_domain(dom, source, days=None)
@@ -304,6 +313,7 @@ def test_import_list(dom: Page, source):
     assert find_domain(dom, existing["name"])["expires_on"] is None, "импорт не должен менять заведённый домен"
 
 
+# Кейс: Поиск домена
 @pytest.mark.writes_data
 def test_search(dom: Page, source):
     item = create_domain(dom, source, note="поиск-автотеста")
@@ -317,6 +327,7 @@ def test_search(dom: Page, source):
         expect(row(dom, other["name"]), query).to_have_count(0)
 
 
+# Кейс: Отключение источника не удаляет его домены
 @pytest.mark.writes_data
 def test_disconnect_source_keeps_domains(dom: Page, source):
     item = create_domain(dom, source)

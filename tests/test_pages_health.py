@@ -36,6 +36,7 @@ ROUTES = [
 ]
 
 
+# Кейс: Раздел открывается без ошибок сервера
 @pytest.mark.smoke
 @pytest.mark.parametrize("route", ROUTES)
 def test_section_opens_without_server_errors(auth_page: Page, route):

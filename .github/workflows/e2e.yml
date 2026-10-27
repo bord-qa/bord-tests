@@ -69,7 +69,8 @@ jobs:
                  --timeout=120 \
                  --screenshot=only-on-failure \
                  --output=test-results \
-                 --html=report.html --self-contained-html
+                 --html=report.html --self-contained-html \
+                 --css=assets/report.css
 
       - name: Upload HTML report
         if: always()

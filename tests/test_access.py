@@ -73,6 +73,7 @@ def role_card(page: Page, name: str):
     return role_cards(page).filter(has=title)
 
 
+# Кейс: Вкладки систем совпадают с подключёнными модулями
 @pytest.mark.smoke
 def test_module_tabs_match_api(access: Page):
     mods = module_roles(access)["modules"]
@@ -82,6 +83,7 @@ def test_module_tabs_match_api(access: Page):
         expect(module_tab(access, mod["name"]), mod["key"]).to_have_text(f"{mod['name']}{len(mod['roles'])}")
 
 
+# Кейс: Карточки ролей системы совпадают с API
 def test_role_cards_match_api(access: Page):
     data = module_roles(access)
     levels = {lvl["key"]: lvl["label"] for lvl in data["levels"]}
@@ -98,6 +100,7 @@ def test_role_cards_match_api(access: Page):
             expect(card).to_contain_text(re.compile(rf"\b{len(role['permissions'])} прав"))
 
 
+# Кейс: Таблица «люди × роли» совпадает с API
 def test_people_matrix_matches_api(access: Page):
     resp = api_get(access, f"{MODULE_ROLES}/matrix")
     assert resp.ok
@@ -117,6 +120,7 @@ def test_people_matrix_matches_api(access: Page):
             expect(row.locator("td").filter(has_text="Владелец — всё")).to_have_count(len(matrix["modules"]))
 
 
+# Кейс: Своя роль системы: создать, изменить, удалить
 @pytest.mark.writes_data
 def test_module_role_create_edit_delete(access: Page):
     main = access.locator("main")
@@ -160,6 +164,7 @@ def test_module_role_create_edit_delete(access: Page):
     assert all(r["id"] != role["id"] for r in module(access, MODULE)["roles"])
 
 
+# Кейс: Шаблонную роль удалить нельзя
 def test_template_role_cannot_be_deleted(access: Page):
     """У шаблонных ролей модуля кнопки «Удалить» нет — только «Вернуть исходную»."""
     mod = module(access, MODULE)

@@ -78,6 +78,7 @@ def form(auth_page: Page):
         assert restored.ok, f"не удалось вернуть реквизиты: {restored.status} {restored.text()}"
 
 
+# Кейс: Форма показывает данные компании из API
 @pytest.mark.smoke
 def test_form_shows_company_from_api(form: CompanyForm):
     data = company(form.page)
@@ -88,6 +89,7 @@ def test_form_shows_company_from_api(form: CompanyForm):
         expect(getattr(form, key), key).to_have_value(data[key] or "")
 
 
+# Кейс: В «Отрасли» все варианты
 def test_industry_offers_all_options(form: CompanyForm):
     form.industry.click()
 
@@ -95,6 +97,7 @@ def test_industry_offers_all_options(form: CompanyForm):
     form.page.keyboard.press("Escape")
 
 
+# Кейс: Реквизиты сохраняются и остаются после перезагрузки
 @pytest.mark.writes_data
 def test_requisites_saved_and_survive_reload(form: CompanyForm):
     stamp = int(time.time()) % 10**6
@@ -121,6 +124,7 @@ def test_requisites_saved_and_survive_reload(form: CompanyForm):
         expect(getattr(form, key), key).to_have_value(value)
 
 
+# Кейс: Отрасль сохраняется
 @pytest.mark.writes_data
 def test_industry_saved(form: CompanyForm):
     current = company(form.page)["industry"]
@@ -136,6 +140,7 @@ def test_industry_saved(form: CompanyForm):
     expect(form.industry).to_have_text(INDUSTRIES[key])
 
 
+# Кейс: IDNO должен быть из 13 цифр
 @pytest.mark.writes_data
 @pytest.mark.parametrize("idno", ["123", "100360001234", "10036000123456", "abcdefghijklm"],
                          ids=["3 цифры", "12 цифр", "14 цифр", "буквы"])
@@ -151,6 +156,7 @@ def test_idno_must_be_13_digits(form: CompanyForm, idno):
     assert company(form.page)["idno"] == before
 
 
+# Кейс: Слишком короткое название не даёт сохранить
 @pytest.mark.parametrize("name", ["", "Q", "   "], ids=["пусто", "1 символ", "пробелы"])
 def test_short_name_blocks_save(form: CompanyForm, name):
     form.name.fill(name)

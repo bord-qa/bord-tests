@@ -73,12 +73,14 @@ def display_name(user: dict) -> str:
     return " ".join(x for x in (user.get("telegram_first_name"), user.get("last_name")) if x)
 
 
+# Кейс: Число сотрудников совпадает с API
 @pytest.mark.smoke
 def test_staff_count_matches_api(users_page: Page, api_users):
     expect(users_page.get_by_text(f"{len(api_users)} человек в организации")).to_be_visible()
     expect(staff_rows(users_page)).to_have_count(len(api_users))
 
 
+# Кейс: Строки сотрудников совпадают с API
 def test_staff_rows_match_api(users_page: Page, api_users, role_labels, qa_user):
     for user in api_users:
         row = staff_rows(users_page).filter(has_text=user["email"])
@@ -91,12 +93,14 @@ def test_staff_rows_match_api(users_page: Page, api_users, role_labels, qa_user)
         expect(row.get_by_role("button", name="Удалить из организации")).to_have_count(0 if is_me else 1)
 
 
+# Кейс: «Доступ к модулям: N из M» считается по всем модулям
 def test_module_access_counts_all_modules(users_page: Page):
     modules = api_get(users_page, "/api/admin/auth/invite-modules").json()["modules"]
 
     expect(users_page.get_by_text(re.compile(rf"Доступ к модулям: \d+ из {len(modules)}$"))).to_be_visible()
 
 
+# Кейс: Ссылка-приглашение: создать и отозвать
 @pytest.mark.writes_data
 def test_invite_link_create_and_revoke(users_page: Page):
     text = note()
@@ -129,6 +133,7 @@ def test_invite_link_create_and_revoke(users_page: Page):
     assert all(i["code"] != invite["code"] for i in api_get(users_page, INVITES).json())
 
 
+# Кейс: Отзыв приглашения можно отменить
 @pytest.mark.writes_data
 def test_revoke_can_be_cancelled(users_page: Page):
     text = note()
@@ -143,6 +148,7 @@ def test_revoke_can_be_cancelled(users_page: Page):
     assert any(i.get("note") == text for i in api_get(users_page, INVITES).json())
 
 
+# Кейс: Ссылка-приглашение открывается гостю
 @pytest.mark.writes_data
 def test_invite_link_opens_for_guest(users_page: Page, browser: Browser, browser_context_args):
     invite = api_post(users_page, INVITES, {"role": "employee", "note": note(), "send_email": False}).json()
@@ -163,6 +169,7 @@ def test_invite_link_opens_for_guest(users_page: Page, browser: Browser, browser
         guest.context.close()
 
 
+# Кейс: Отозванная ссылка не работает
 @pytest.mark.writes_data
 def test_revoked_invite_link_is_dead(users_page: Page, browser: Browser, browser_context_args):
     invite = api_post(users_page, INVITES, {"role": "employee", "note": note(), "send_email": False}).json()
@@ -179,6 +186,7 @@ def test_revoked_invite_link_is_dead(users_page: Page, browser: Browser, browser
         guest.context.close()
 
 
+# Кейс: Добавление с платформы: неизвестный email
 def test_add_from_platform_unknown_email(users_page: Page, api_users):
     users_page.get_by_role("button", name="Добавить из платформы").click()
     with users_page.expect_response(lambda r: "/api/admin/auth/users/search" in r.url) as search:

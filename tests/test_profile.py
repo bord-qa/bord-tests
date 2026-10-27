@@ -59,6 +59,7 @@ def profile(auth_page: Page):
     return auth_page
 
 
+# Кейс: «Мои данные» совпадают с аккаунтом
 @pytest.mark.smoke
 def test_my_info_matches_account(profile: Page, qa_user):
     user = profile.evaluate("() => JSON.parse(localStorage.getItem('admin_user'))")
@@ -71,6 +72,7 @@ def test_my_info_matches_account(profile: Page, qa_user):
     expect(info.locator("div", has=profile.locator("dt", has_text="Telegram")).locator("dd")).to_have_text(f"@{tg}" if tg else "—")
 
 
+# Кейс: «Мои системы» совпадают с API
 def test_my_modules_match_api(profile: Page):
     mine = api_get(profile, "/api/modules/mine")
     assert mine.ok, f"/api/modules/mine → {mine.status}"
@@ -84,6 +86,7 @@ def test_my_modules_match_api(profile: Page):
     expect(section.get_by_role("link", name="Открыть")).to_have_count(len(expected))
 
 
+# Кейс: Пустой и короткий пароль не отправляются
 def test_password_empty_and_short_blocked_by_browser(profile: Page):
     form = PasswordForm(profile)
     sent = collect_change_requests(profile)
@@ -101,6 +104,7 @@ def test_password_empty_and_short_blocked_by_browser(profile: Page):
     assert not sent, "форма с невалидными полями ушла на сервер"
 
 
+# Кейс: Пароли не совпадают — ошибка
 def test_password_mismatch(profile: Page, qa_user):
     form = PasswordForm(profile)
     sent = collect_change_requests(profile)
@@ -112,6 +116,7 @@ def test_password_mismatch(profile: Page, qa_user):
     assert not sent, "при несовпадении паролей запрос всё равно ушёл"
 
 
+# Кейс: Неверный текущий пароль — ошибка
 def test_password_wrong_current(profile: Page):
     resp = PasswordForm(profile).change("WrongCurrent1!", "NewPassw0rd!")
 
@@ -120,6 +125,7 @@ def test_password_wrong_current(profile: Page):
     expect(profile.get_by_text("Invalid current password")).to_be_visible()
 
 
+# Кейс: Смена пароля и возврат старого
 def test_password_change_and_revert(page: Page, qa_user, playwright):
     """Смена пароля туда и обратно. Свой вход (не общая сессия прогона).
     Пароль возвращается в finally; если откат не прошёл, рабочий пароль —

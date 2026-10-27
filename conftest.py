@@ -39,3 +39,7 @@ def auth_page(browser, auth_state, browser_context_args):
     page = ctx.new_page()
     yield page
     ctx.close()
+
+
+# Оформление отчёта (терминал, HTML, сводка в Actions) — отдельно, в reporting.py.
+pytest_plugins = ("reporting",)

@@ -104,6 +104,7 @@ def submit(page: Page, form, method: str = "POST"):
     return resp.value
 
 
+# Кейс: Сущности модуля загружаются
 @pytest.mark.smoke
 @pytest.mark.parametrize("tab", ENTITIES)
 def test_module_entities_load(cf: Page, tab):
@@ -123,6 +124,7 @@ def test_module_entities_load(cf: Page, tab):
     cf.keyboard.press("Escape")
 
 
+# Кейс: Создание текстового поля
 @pytest.mark.writes_data
 def test_create_text_field(cf: Page):
     name = sysname("text")
@@ -147,6 +149,7 @@ def test_create_text_field(cf: Page):
     assert any(d["field_name"] == name and d["is_required"] for d in definitions(cf))
 
 
+# Кейс: Создание поля-списка с вариантами
 @pytest.mark.writes_data
 def test_create_select_field_with_options(cf: Page):
     name = sysname("sel")
@@ -168,6 +171,7 @@ def test_create_select_field_with_options(cf: Page):
     assert saved["field_type"] == "select" and [o["value"] for o in saved["options"]] == ["site", "call"]
 
 
+# Кейс: Список без вариантов не сохраняется
 def test_select_without_options_blocked(cf: Page):
     posts = []
     cf.on("request", lambda r: posts.append(r.url) if r.method == "POST" and API in r.url else None)
@@ -182,6 +186,7 @@ def test_select_without_options_blocked(cf: Page):
     assert posts == []
 
 
+# Кейс: Пустой вариант списка не принимается
 @pytest.mark.writes_data
 def test_select_with_blank_option_rejected(cf: Page):
     """Пустую строку варианта фронт пропускает — отказывает сервер (текст пока по-английски, ecom-100159)."""
@@ -199,6 +204,7 @@ def test_select_with_blank_option_rejected(cf: Page):
     assert all(d["field_name"] != name for d in definitions(cf))
 
 
+# Кейс: Повторное системное имя не принимается
 @pytest.mark.writes_data
 def test_duplicate_sysname_rejected(cf: Page):
     existing = create_field(cf)
@@ -214,6 +220,7 @@ def test_duplicate_sysname_rejected(cf: Page):
     assert [d["id"] for d in definitions(cf) if d["field_name"] == existing["field_name"]] == [existing["id"]]
 
 
+# Кейс: Системное имя — только латиница
 def test_sysname_only_latin(cf: Page):
     form = open_new(cf)
     form.get_by_placeholder("Например: ИНН").fill("QA Autotest поле")
@@ -227,6 +234,7 @@ def test_sysname_only_latin(cf: Page):
     form.get_by_role("button", name="Отмена").click()
 
 
+# Кейс: Скрыть и снова показать поле
 @pytest.mark.writes_data
 def test_hide_and_show_field(cf: Page):
     item = create_field(cf)
@@ -244,6 +252,7 @@ def test_hide_and_show_field(cf: Page):
     assert next(d for d in definitions(cf) if d["id"] == item["id"])["is_visible"] is True
 
 
+# Кейс: Изменение поля
 @pytest.mark.writes_data
 def test_edit_field(cf: Page):
     item = create_field(cf)
@@ -262,6 +271,7 @@ def test_edit_field(cf: Page):
     expect(row(cf, item["field_name"])).to_contain_text("QA Autotest поле изм.")
 
 
+# Кейс: Удаление поля
 @pytest.mark.writes_data
 def test_delete_field(cf: Page):
     item = create_field(cf)
@@ -277,6 +287,7 @@ def test_delete_field(cf: Page):
     assert all(d["id"] != item["id"] for d in definitions(cf))
 
 
+# Кейс: Удаление поля можно отменить
 @pytest.mark.writes_data
 def test_delete_can_be_cancelled(cf: Page):
     item = create_field(cf)
@@ -289,6 +300,7 @@ def test_delete_can_be_cancelled(cf: Page):
     assert any(d["id"] == item["id"] for d in definitions(cf))
 
 
+# Кейс: Поле видно только у своей сущности
 @pytest.mark.writes_data
 def test_field_belongs_to_its_entity(cf: Page):
     lead = create_field(cf, entity="lead")

@@ -51,6 +51,7 @@ def modules(start: Page) -> dict:
     return {m["module_key"]: m for m in resp.json() if m["is_enabled"]}
 
 
+# Кейс: API карты организации доступно
 @pytest.mark.smoke
 def test_org_map_api_available(start: Page):
     """Сам источник карты отвечает. Красный = карта у организации сломана."""
@@ -60,6 +61,7 @@ def test_org_map_api_available(start: Page):
     expect(start.get_by_text("Не удалось загрузить раскладку по функциям")).to_have_count(0)
 
 
+# Кейс: Ячейки карты совпадают с API
 def test_map_slots_match_api(start: Page, org_map):
     for slot in org_map["slots"]:
         section = start.locator(f"section[data-slot='{slot['key']}']")
@@ -67,6 +69,7 @@ def test_map_slots_match_api(start: Page, org_map):
         expect(section).to_contain_text(slot["name"], ignore_case=True)
 
 
+# Кейс: Системы стоят на карте как в API
 def test_systems_placed_as_in_api(start: Page, org_map, modules):
     for slot in org_map["slots"]:
         expected = sorted(
@@ -80,6 +83,7 @@ def test_systems_placed_as_in_api(start: Page, org_map, modules):
             expect(section.get_by_text("Нет систем")).to_be_visible()
 
 
+# Кейс: У каждого подключённого модуля есть плитка со ссылкой
 def test_every_enabled_module_has_tile_with_link(start: Page, org_map, modules):
     for key, module in modules.items():
         if org_map["placement"].get(key) == org_map["unused"]:
@@ -93,6 +97,7 @@ def test_every_enabled_module_has_tile_with_link(start: Page, org_map, modules):
             expect(tile).to_have_attribute("target", "_blank")
 
 
+# Кейс: Внутренняя плитка открывает раздел
 def test_internal_tile_opens_section(start: Page, org_map):
     start.locator("section[data-slot] a[href='/admin/tasks']").click()
 
@@ -100,6 +105,7 @@ def test_internal_tile_opens_section(start: Page, org_map):
     expect(start).to_have_title(re.compile("Задачи"))
 
 
+# Кейс: «Настроить» предлагает все шаблоны
 def test_configure_offers_all_presets(start: Page, org_map):
     """«Настроить» показывает все шаблоны вертикали. Шаблон не выбираем —
     раскладка общая на организацию и сохраняется сразу."""

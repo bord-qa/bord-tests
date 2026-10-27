@@ -91,6 +91,7 @@ def fact(card, term: str):
     return card.locator("dt", has_text=re.compile(rf"^{term}$")).locator("xpath=following-sibling::dd[1]")
 
 
+# Кейс: Новый продукт: карточка и строка в списке
 @pytest.mark.writes_data
 def test_product_create_shows_card_and_row(products: Page):
     stamp = unique()
@@ -131,6 +132,7 @@ def test_product_create_shows_card_and_row(products: Page):
     expect(row.locator("td").nth(2)).to_have_text("Внутренний")
 
 
+# Кейс: Код проверяется до отправки
 @pytest.mark.parametrize(
     ("code", "message"),
     [("", "Укажите код продукта"), ("код с пробелом", CODE_RULE), ("-abc", CODE_RULE)],
@@ -149,6 +151,7 @@ def test_code_checked_before_request(products: Page, code, message):
     assert posts == [], "форма отправила продукт с неверным кодом"
 
 
+# Кейс: API не принимает неверный код
 @pytest.mark.parametrize("code", ["код с пробелом", "-abc", "a" * 51, ""], ids=["кириллица", "с дефиса", "51 символ", "пусто"])
 def test_api_rejects_bad_code(products: Page, code):
     resp = api_post(products, API, {"name": f"{NAME_PREFIX} {unique()}", "code": code, "kind": "sold"})
@@ -157,6 +160,7 @@ def test_api_rejects_bad_code(products: Page, code):
     assert resp.json()["detail"] == CODE_RULE
 
 
+# Кейс: Повторный код не принимается
 @pytest.mark.writes_data
 @pytest.mark.parametrize("archived", [False, True], ids=["у действующего", "у архивного"])
 def test_duplicate_code_blocked(products: Page, archived):
@@ -177,6 +181,7 @@ def test_duplicate_code_blocked(products: Page, archived):
         assert [p["id"] for p in same if p["code"] == existing["code"]] in ([], [existing["id"]])
 
 
+# Кейс: Порядок сортировки поднимает продукт выше
 @pytest.mark.writes_data
 def test_sort_order_lifts_product(products: Page):
     stamp = unique()
@@ -189,6 +194,7 @@ def test_sort_order_lifts_product(products: Page):
     expect(rows(products).locator("td:first-child")).to_contain_text([high["name"], low["name"]])
 
 
+# Кейс: Поиск по названию и коду
 @pytest.mark.writes_data
 def test_search_by_name_and_code(products: Page):
     product = create_product(products)
@@ -204,6 +210,7 @@ def test_search_by_name_and_code(products: Page):
     expect(products.locator("main").get_by_text("Ничего не нашлось. Попробуйте код или другое написание названия.")).to_be_visible()
 
 
+# Кейс: Изменение продукта
 @pytest.mark.writes_data
 def test_edit_product(products: Page):
     product = create_product(products)
@@ -228,6 +235,7 @@ def test_edit_product(products: Page):
     expect(rows(products).filter(has_text=new_name).locator("td").nth(2)).to_have_text("Внутренний")
 
 
+# Кейс: В архив и обратно
 @pytest.mark.writes_data
 def test_archive_and_restore(products: Page):
     product = create_product(products)
@@ -260,6 +268,7 @@ def test_archive_and_restore(products: Page):
     expect(rows(products).filter(has_text=product["name"])).to_have_count(1)
 
 
+# Кейс: Отправку в архив можно отменить
 @pytest.mark.writes_data
 def test_archive_can_be_cancelled(products: Page):
     product = create_product(products)

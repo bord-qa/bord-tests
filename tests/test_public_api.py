@@ -129,6 +129,7 @@ def token_row(page: Page, token_name: str):
         "xpath=ancestor::*[.//button[@title='View audit log']][1]")
 
 
+# Кейс: Токен создаётся в форме и показывается один раз
 @pytest.mark.writes_data
 def test_create_token_via_form_shown_once(dev: Page):
     token_name = name()
@@ -165,6 +166,7 @@ def test_create_token_via_form_shown_once(dev: Page):
     assert "token" not in listed and listed["is_active"]
 
 
+# Кейс: Токен читает свой модуль
 def test_token_reads_its_module(shared_token):
     page, token = shared_token
 
@@ -182,6 +184,7 @@ def test_token_reads_its_module(shared_token):
     assert {e["email"] for e in body["items"]} <= users
 
 
+# Кейс: Токен на чтение не может писать
 def test_read_token_cannot_write(shared_token):
     page, token = shared_token
 
@@ -191,6 +194,7 @@ def test_read_token_cannot_write(shared_token):
     assert resp.json()["detail"] == {"error": "insufficient_scope", "message": "Token lacks required scope: hrm.write"}
 
 
+# Кейс: Неверный токен — 401
 @pytest.mark.parametrize(
     ("token", "error"),
     [(None, "unauthorized"), ("bord_" + "0" * 40, "invalid_token")],
@@ -203,12 +207,14 @@ def test_bad_token_unauthorized(dev: Page, token, error):
     assert resp.json()["detail"]["error"] == error
 
 
+# Кейс: Токен не принимается админским API
 def test_token_not_accepted_by_admin_api(shared_token):
     page, token = shared_token
 
     assert call(page, "/api/admin/auth/users", token["token"]).status == 401
 
 
+# Кейс: Лимит запросов
 @pytest.mark.writes_data
 def test_rate_limit(dev: Page):
     token = create_token(dev, rate_limit=3)
@@ -218,6 +224,7 @@ def test_rate_limit(dev: Page):
     assert statuses == [200, 200, 200, 429]
 
 
+# Кейс: Отзыв токена в интерфейсе
 @pytest.mark.writes_data
 def test_revoke_via_ui(dev: Page):
     token = create_token(dev)
@@ -234,6 +241,7 @@ def test_revoke_via_ui(dev: Page):
     assert call(dev, "/api/v1/hrm/employees/", token["token"]).status == 401
 
 
+# Кейс: Перевыпуск токена в интерфейсе
 @pytest.mark.writes_data
 def test_regenerate_via_ui(dev: Page):
     token = create_token(dev)
@@ -255,6 +263,7 @@ def test_regenerate_via_ui(dev: Page):
     assert call(dev, "/api/v1/hrm/employees/", new).status == 200
 
 
+# Кейс: Журнал показывает вызовы
 def test_audit_log_shows_calls(shared_token, dev: Page):
     page, token = shared_token
     assert call(page, "/api/v1/hrm/employees/?limit=1", token["token"]).ok
@@ -270,6 +279,7 @@ def test_audit_log_shows_calls(shared_token, dev: Page):
     expect(log).to_contain_text("/v1/hrm/employees/")
 
 
+# Кейс: Описанный в документации адрес отвечает
 @pytest.mark.parametrize(("module", "path"), DOCUMENTED, ids=[f"{m}{p}" for m, p in DOCUMENTED])
 def test_documented_endpoint_answers(shared_token, module, path):
     page, token = shared_token

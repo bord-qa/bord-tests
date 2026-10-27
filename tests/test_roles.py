@@ -83,6 +83,7 @@ def create_in_form(page: Page, name: str, labels: list[str]) -> dict:
     return created.value.json()
 
 
+# Кейс: Карточки ролей совпадают с API
 @pytest.mark.smoke
 def test_role_cards_match_api(roles_page: Page):
     data = perms(roles_page)
@@ -94,6 +95,7 @@ def test_role_cards_match_api(roles_page: Page):
         expect(card).to_contain_text(f"{len(role['permissions'])} из {total} прав")
 
 
+# Кейс: Таблица прав совпадает с API
 def test_matrix_matches_api(roles_page: Page):
     data = perms(roles_page)
     # textContent, а не innerText: заголовки выводятся капсом через CSS
@@ -111,6 +113,7 @@ def test_matrix_matches_api(roles_page: Page):
             expect(row.locator("td").nth(col).locator("svg"), f"{perm} × {label}").to_have_class(re.compile(icon))
 
 
+# Кейс: Права, которые нельзя выдать, заблокированы
 def test_never_grantable_permissions_locked(editor: Page):
     data = perms(editor)
     main = editor.locator("main")
@@ -129,6 +132,7 @@ def test_never_grantable_permissions_locked(editor: Page):
     main.get_by_role("button", name="Отменить").click()
 
 
+# Кейс: Своя роль: создать, изменить, удалить
 @pytest.mark.writes_data
 def test_custom_role_create_edit_delete(editor: Page):
     main = editor.locator("main")
@@ -162,6 +166,7 @@ def test_custom_role_create_edit_delete(editor: Page):
     assert role["slug"] not in perms(editor)["roles"]
 
 
+# Кейс: Своя роль предлагается в приглашении
 @pytest.mark.writes_data
 def test_custom_role_offered_in_invite(roles_page: Page):
     """Своя роль сразу выбирается при приглашении сотрудника."""
@@ -175,6 +180,7 @@ def test_custom_role_offered_in_invite(roles_page: Page):
     expect(roles_page.locator("main select").first.locator("option", has_text=name)).to_have_count(1)
 
 
+# Кейс: Удаление роли можно отменить
 @pytest.mark.writes_data
 def test_delete_role_can_be_cancelled(editor: Page):
     name = role_name()

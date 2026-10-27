@@ -56,6 +56,7 @@ def card(page: Page, module: dict):
         "xpath=ancestor::*[.//a[normalize-space()='Открыть']][1]")
 
 
+# Кейс: Модули совпадают с API
 @pytest.mark.smoke
 def test_modules_match_api(sub):
     page, data = sub
@@ -69,6 +70,7 @@ def test_modules_match_api(sub):
         expect(box).to_contain_text(price_text(module["price"]))
 
 
+# Кейс: Ссылки «Открыть» ведут в свои системы
 def test_open_links(sub):
     page, data = sub
 
@@ -81,6 +83,7 @@ def test_open_links(sub):
             expect(link).to_have_attribute("target", "_blank")
 
 
+# Кейс: Кнопка оплаты — только у платных модулей
 def test_pay_buttons_only_for_priced_modules(sub):
     """Кнопки оплаты — только у модулей с ценой; «Отключить» — у каждого подключённого. Не нажимаем."""
     page, data = sub
@@ -93,6 +96,7 @@ def test_pay_buttons_only_for_priced_modules(sub):
         expect(box.get_by_role("button", name="Отключить")).to_have_count(1)
 
 
+# Кейс: Нишевые модули — на отдельной странице
 def test_niche_modules_on_separate_page(sub):
     page, data = sub
     niche = [m for m in data["modules"] if m["niche"] and m["enabled"]]
@@ -107,6 +111,7 @@ def test_niche_modules_on_separate_page(sub):
         expect(page.locator("main"), module["key"]).to_contain_text(module["name"])
 
 
+# Кейс: Плашка реквизитов зависит от данных компании
 @pytest.mark.writes_data
 def test_requisites_banner_follows_company(sub):
     page, data = sub

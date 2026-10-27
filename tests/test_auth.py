@@ -14,6 +14,7 @@ from helpers.auth import LOGIN_API, LoginForm, has_token, login, logout_button
 pytestmark = pytest.mark.requires_auth
 
 
+# Кейс: Вход с верными email и паролем
 @pytest.mark.smoke
 def test_login_success(page: Page, qa_user):
     login(page, qa_user)
@@ -23,6 +24,7 @@ def test_login_success(page: Page, qa_user):
     assert has_token(page), "после входа нет admin_token в localStorage"
 
 
+# Кейс: Неверный пароль — ошибка, вход не выполнен
 def test_login_wrong_password(page: Page, qa_user):
     form = LoginForm(page).open().fill(qa_user["email"], "WrongPass123!")
     with page.expect_response(lambda r: LOGIN_API in r.url) as resp:
@@ -34,6 +36,7 @@ def test_login_wrong_password(page: Page, qa_user):
     assert not has_token(page)
 
 
+# Кейс: Неизвестный email — та же ошибка, что и при неверном пароле
 def test_login_unknown_email_same_error(page: Page):
     """Несуществующий email даёт ту же ошибку, что и неверный пароль:
     по ответу нельзя узнать, зарегистрирована ли почта."""
@@ -46,6 +49,7 @@ def test_login_unknown_email_same_error(page: Page):
     assert not has_token(page)
 
 
+# Кейс: Пустые поля — форма не отправляется
 def test_login_empty_fields_not_sent(page: Page):
     form = LoginForm(page).open()
     sent = []
@@ -60,6 +64,7 @@ def test_login_empty_fields_not_sent(page: Page):
     expect(form.heading).to_be_visible()
 
 
+# Кейс: Гость на закрытой странице видит форму входа
 @pytest.mark.smoke
 @pytest.mark.parametrize("path", ["/admin/tasks", "/admin/users", "/admin/settings/company"])
 def test_protected_page_shows_login_for_guest(page: Page, path):
@@ -69,6 +74,7 @@ def test_protected_page_shows_login_for_guest(page: Page, path):
     expect(logout_button(page)).to_have_count(0)
 
 
+# Кейс: Сессия сохраняется после перезагрузки
 def test_session_survives_reload(auth_page: Page):
     auth_page.goto("/admin/tasks")
     expect(logout_button(auth_page)).to_be_visible()
@@ -79,6 +85,7 @@ def test_session_survives_reload(auth_page: Page):
     expect(LoginForm(auth_page).heading).to_have_count(0)
 
 
+# Кейс: Выход из аккаунта
 def test_logout(page: Page, qa_user):
     # Свой вход, а не auth_page: выход не должен ломать общую сессию прогона.
     login(page, qa_user)
@@ -91,6 +98,7 @@ def test_logout(page: Page, qa_user):
     expect(LoginForm(page).heading).to_be_visible()
 
 
+# Кейс: Сброс пароля, вход по ссылке, регистрация: форма открывается и возвращает назад
 @pytest.mark.parametrize(
     "link, heading, submit",
     [
@@ -111,6 +119,7 @@ def test_auxiliary_forms_open_and_back(page: Page, link, heading, submit):
     expect(form.heading).to_be_visible()
 
 
+# Кейс: CRM открывается без повторного пароля (SSO)
 def test_sso_opens_crm_without_password(auth_page: Page):
     """Единый вход: после входа на app.bord.one CRM открывается без пароля."""
     with auth_page.expect_response(lambda r: "/api/admin/sso/exchange" in r.url) as resp:
