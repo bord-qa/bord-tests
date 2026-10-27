@@ -15,8 +15,9 @@
 
 Настоящие адреса в «Команду» не вводим — придёт письмо. ecom-100214: адрес
 не проверяется ни формой, ни сервером — «not-an-email» становится рабочим
-приглашением с галочкой «отправлено». Тест на это — xfail, созданное
-приглашение отзываем. Реквизиты общие на организацию — фикстура возвращает их.
+приглашением с галочкой «отправлено», а так как приглашение с письмом сразу
+заводит аккаунт, «not-an-email» становится и участником BORD QA. Тест на это —
+xfail; уборка отзывает приглашение и удаляет такого участника. Реквизиты общие на организацию — фикстура возвращает их.
 """
 import time
 
@@ -31,6 +32,7 @@ pytestmark = pytest.mark.requires_auth
 ONBOARDING = "/api/onboarding"
 SAVE = "/api/onboarding/company"
 INVITES = "/api/admin/auth/invites"
+USERS = "/api/admin/auth/users"
 FIELDS = ("name", "industry", "legal_name", "idno", "vat_code", "address", "phone")
 BAD_EMAIL_PREFIX = "qa-autotest-no-at-"
 EMAIL_BUG = "ecom-100214: приглашение создаётся на строку без «@», мастер ставит галочку «отправлено»"
@@ -47,6 +49,12 @@ def revoke_bad_invites(page: Page):
     for inv in resp.json() if resp.ok else []:
         if (inv.get("email") or "").startswith(BAD_EMAIL_PREFIX):
             api_delete(page, f"{INVITES}/{inv['code']}")
+    # приглашение с письмом сразу заводит участника (и аккаунт) — пока жив ecom-100214,
+    # «адрес» без @ становится членом BORD QA; удаление из единственной орги стирает и аккаунт
+    resp = api_get(page, USERS)
+    for user in resp.json() if resp.ok else []:
+        if (user.get("email") or "").startswith(BAD_EMAIL_PREFIX):
+            api_delete(page, f"{USERS}/{user['id']}")
 
 
 @pytest.fixture

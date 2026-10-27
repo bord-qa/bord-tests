@@ -22,8 +22,12 @@ USERS_FILE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "us
 
 
 def load_user(key: str = "qaUser") -> dict | None:
-    """Учётка из env (CI) или tests/fixtures/users.json (локально)."""
-    if os.environ.get("BORD_EMAIL") and os.environ.get("BORD_PASSWORD"):
+    """Учётка из env (CI) или tests/fixtures/users.json (локально).
+
+    BORD_EMAIL/BORD_PASSWORD — только основная учётка: иначе «коллега»
+    молча оказался бы тем же владельцем.
+    """
+    if key == "qaUser" and os.environ.get("BORD_EMAIL") and os.environ.get("BORD_PASSWORD"):
         return {
             "email": os.environ["BORD_EMAIL"],
             "password": os.environ["BORD_PASSWORD"],
