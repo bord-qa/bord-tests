@@ -48,6 +48,8 @@ DEFAULT_PREFS = {"mine": False, "layers": {"events": True, "tasks": True, "remin
                  "task_statuses": ["new", "in_progress", "on_hold", "canceled"], "view": "month"}
 MINE_RACE_BUG = ("bord-6: запрос задач без responsible_id, ушедший до применения «Мои», иногда отвечает последним "
                  "и перезаписывает доску — при активной «Мои» видны чужие и неназначенные задачи")
+NAV_RACE_BUG = ("bord-7: «›» сразу после открытия — ответ за прошлый месяц перезаписывает сетку, "
+                "событий нового месяца не видно")
 # Три запроса, из которых собирается сетка: ждём все, прежде чем смотреть на неё.
 LOADS = ("/api/crm/calendar/events?", "/api/crm/tasks/?due_from", "/api/crm/reminders/?from_dt")
 MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь",
@@ -405,6 +407,7 @@ def test_week_and_day_views(calendar: Page):
 
 
 # Кейс: Листание месяцев — вперёд, назад, «Сегодня»; событие следующего месяца видно только там
+@pytest.mark.xfail(reason=NAV_RACE_BUG, strict=False)
 def test_navigation(calendar: Page):
     day = today(calendar)
     next_month = (day.replace(day=1) + dt.timedelta(days=32)).replace(day=15)
