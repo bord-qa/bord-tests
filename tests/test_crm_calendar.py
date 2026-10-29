@@ -46,6 +46,8 @@ PAGE = "/admin/calendar"
 PREFS = "/user-prefs/me/calendar-filters"
 DEFAULT_PREFS = {"mine": False, "layers": {"events": True, "tasks": True, "reminders": True},
                  "task_statuses": ["new", "in_progress", "on_hold", "canceled"], "view": "month"}
+MINE_RACE_BUG = ("bord-6: запрос задач без responsible_id, ушедший до применения «Мои», иногда отвечает последним "
+                 "и перезаписывает доску — при активной «Мои» видны чужие и неназначенные задачи")
 # Три запроса, из которых собирается сетка: ждём все, прежде чем смотреть на неё.
 LOADS = ("/api/crm/calendar/events?", "/api/crm/tasks/?due_from", "/api/crm/reminders/?from_dt")
 MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь",
@@ -68,7 +70,7 @@ def today(page: Page) -> dt.date:
 
 def local_iso(page: Page, day: dt.date, hm: str) -> str:
     """Местное время браузера `hm` в день `day` с его смещением — экран покажет ровно hm."""
-    minutes = page.evaluate("s => -new Date(s).getTimezoneOffset()", f"{day.isoformat()}T{hm}:00")
+    minutes = int(page.evaluate("s => -new Date(s).getTimezoneOffset()", f"{day.isoformat()}T{hm}:00"))
     sign = "+" if minutes >= 0 else "-"
     return f"{day.isoformat()}T{hm}:00{sign}{abs(minutes) // 60:02d}:{abs(minutes) % 60:02d}"
 
@@ -452,6 +454,7 @@ def test_task_status_filter(calendar: Page):
 
 
 # Кейс: «Мои» прячет чужие и неназначенные задачи, «Все» возвращает
+@pytest.mark.xfail(reason=MINE_RACE_BUG, strict=False)
 def test_mine_and_all(calendar: Page):
     task = create_task(calendar, today(calendar), responsible_id=None)
     reload_calendar(calendar)

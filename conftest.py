@@ -9,6 +9,8 @@ def browser_context_args(browser_context_args):
         **browser_context_args,
         "viewport": {"width": 1920, "height": 1080},
         "locale": "ru-RU",
+        # CRM показывает время в зашитом Europe/Chisinau, раннер CI живёт в UTC — без этого время и дни на экране расходятся с тестом
+        "timezone_id": "Europe/Chisinau",
     }
 
 
