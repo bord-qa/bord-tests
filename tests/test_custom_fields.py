@@ -1,20 +1,20 @@
 """Блок 13. Кастомные поля: app.bord.one/admin/settings/custom-fields.
 
 Снято 22.10.2026:
-- вкладки модулей CRM / HRM / Финансы / Склад / Тикеты, «Тип сущности» —
+- вкладки модулей CRM / HRM / Финансы / Склад, «Тип сущности» —
   выпадашка; список: GET /api/custom-fields/definitions/?module=&entity_type=;
 - «Добавить поле» → окно «Новое кастомное поле»: Название поля, Системное имя
   (подставляется из названия, пускает только латиницу/цифры/«_» — кириллица
   выбрасывается), Тип поля (12 типов), у «Выбор из списка» — варианты
   (Название / value), Placeholder, Значение по умолчанию, Обязательное,
   Видимое → POST …/definitions/ → 201; список без вариантов → 400, занятое
-  системное имя → 409 (тексты пока по-английски — ecom-100159); без
-  вариантов форма сама пишет «Добавьте хотя бы один вариант»;
+  системное имя → 409; без вариантов (и с одним пустым вариантом)
+  форма сама пишет «Добавьте хотя бы один вариант» и запрос не шлёт;
 - в строке: «Скрыть»/«Показать» (PUT {is_visible}), «Редактировать» (окно
   «Редактировать поле», системное имя не меняется, PUT), «Удалить» → окно
   «Удалить поле "…"? Все значения будут потеряны.» → DELETE ?force=true;
-- «Тикеты»: сервер не знает модуль — 400 «Invalid module: tickets»
-  (ecom-100158), экран при этом пишет «Нет кастомных полей».
+- 28.10.2026 вкладку «Тикеты» убрали (ecom-100158: сервер не знал модуль),
+  пустой вариант списка теперь отсекает фронт (ecom-100159).
 
 Поля общие на организацию и видны в модулях, поэтому тесты заводят только
 «QA Autotest …» с системным именем qa_… у CRM (Лид, Контакт) и удаляют их.
@@ -32,13 +32,11 @@ from helpers.wait import settle
 pytestmark = pytest.mark.requires_auth
 
 API = "/api/custom-fields/definitions/"
-TICKETS_BUG = "ecom-100158: «Тикеты» — 400 «Invalid module: tickets»"
 ENTITIES = {
     "CRM": ("crm", ["Лид", "Контакт", "Компания", "Сделка", "Задача"]),
     "HRM": ("hrm", ["Сотрудник", "Кандидат", "Заявка на отпуск", "Обучение"]),
     "Финансы": ("finance", ["Транзакция", "Счёт", "Контрагент", "Платёж"]),
     "Склад": ("wms", ["Товар", "Заказ", "Склад", "Приёмка", "Отгрузка"]),
-    "Тикеты": ("tickets", ["Тикет", "Статья"]),
 }
 USED = [("crm", "lead"), ("crm", "contact")]
 
@@ -116,8 +114,6 @@ def test_module_entities_load(cf: Page, tab):
     with cf.expect_response(lambda r: f"module={module}&" in r.url) as loaded:
         main.get_by_role("button", name=tab, exact=True).click()
 
-    if module == "tickets" and loaded.value.status == 400:
-        pytest.xfail(TICKETS_BUG)
     assert loaded.value.ok, f"{tab}: {loaded.value.status} {loaded.value.text()}"
     main.locator("button[aria-haspopup='listbox']").click()
     expect(cf.get_by_role("option")).to_have_text(labels)
@@ -187,9 +183,10 @@ def test_select_without_options_blocked(cf: Page):
 
 
 # Кейс: Пустой вариант списка не принимается
-@pytest.mark.writes_data
 def test_select_with_blank_option_rejected(cf: Page):
-    """Пустую строку варианта фронт пропускает — отказывает сервер (текст пока по-английски, ecom-100159)."""
+    """Пустую строку варианта фронт не считает вариантом (до ecom-100159 пропускал, отказывал сервер)."""
+    posts = []
+    cf.on("request", lambda r: posts.append(r.url) if r.method == "POST" and API in r.url else None)
     name = sysname("sel")
     form = open_new(cf)
     form.get_by_placeholder("Например: ИНН").fill("QA Autotest пустой вариант")
@@ -197,10 +194,10 @@ def test_select_with_blank_option_rejected(cf: Page):
     pick(cf, form, "Текст", "Выбор из списка")
     form.get_by_role("button", name="Добавить вариант").click()
 
-    resp = submit(cf, form)
+    form.get_by_role("button", name="Создать").click()
 
-    assert resp.status == 400
-    expect(form.get_by_text(resp.json()["detail"])).to_be_visible()
+    expect(form.get_by_text("Добавьте хотя бы один вариант")).to_be_visible()
+    assert posts == []
     assert all(d["field_name"] != name for d in definitions(cf))
 
 

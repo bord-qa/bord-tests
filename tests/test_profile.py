@@ -121,8 +121,8 @@ def test_password_wrong_current(profile: Page):
     resp = PasswordForm(profile).change("WrongCurrent1!", "NewPassw0rd!")
 
     assert resp.status == 401
-    # Сейчас сервер отдаёт текст по-английски, фронт показывает его как есть.
-    expect(profile.get_by_text("Invalid current password")).to_be_visible()
+    # Текст ошибки приходит с сервера, фронт показывает его как есть (до 28.10.2026 был по-английски).
+    expect(profile.get_by_text(resp.json()["detail"])).to_have_text("Неверный текущий пароль")
 
 
 # Кейс: Смена пароля и возврат старого

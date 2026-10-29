@@ -4,7 +4,8 @@
 .bord.one, по ней каждая система получает свой вход. Проверяем все адреса из
 helpers/modules.py на домене bord.one: нет формы пароля, не ушли на /login, в
 интерфейсе видна организация «BORD QA».
-- LMS: «Ошибка SSO (500)», /auth/me → 500 (ecom-100164);
+- lms.bord.one и rms.bord.one выключены намеренно (29.10.2026 домены убраны из DNS,
+  плитки на стартовой пока остались) — не проверяем;
 - app.ecom.md, app.facturi.md, app.targeting.md — другие домены, кука до них
   не доходит, там своя форма входа (так ли задумано — вопрос открыт, не тестируем).
 """
@@ -16,8 +17,9 @@ from helpers.wait import settle
 
 pytestmark = pytest.mark.requires_auth
 
-LMS_BUG = "ecom-100164: LMS — «Ошибка SSO (500)», /auth/me → 500"
-SYSTEMS = sorted({url for url in TILE_HREF.values() if url.startswith("https://") and ".bord.one/" in url})
+DISABLED = ("lms.bord.one", "rms.bord.one")
+SYSTEMS = sorted({url for url in TILE_HREF.values()
+                  if url.startswith("https://") and ".bord.one/" in url and url.split("/")[2] not in DISABLED})
 
 
 def ids(url: str) -> str:
@@ -31,8 +33,6 @@ def test_system_opens_without_password(auth_page: Page, url):
     auth_page.goto(url)
     settle(auth_page, timeout=15_000)
 
-    if "lms.bord.one" in url and auth_page.get_by_text("Ошибка SSO").count():
-        pytest.xfail(LMS_BUG)
     host = url.split("/")[2]
     assert auth_page.url.startswith(f"https://{host}/"), f"увело на {auth_page.url}"
     assert "/login" not in auth_page.url, f"{url}: попросили войти — {auth_page.url}"
