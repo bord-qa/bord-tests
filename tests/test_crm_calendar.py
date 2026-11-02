@@ -391,7 +391,10 @@ def test_week_and_day_views(calendar: Page):
 
     with prefs_saved(calendar):
         view_button(calendar, "Неделя").click()
-    week = f"{monday.day} {MONTHS[monday.month - 1]} – {sunday.day} {MONTHS[sunday.month - 1]} {sunday.year}"
+    if monday.month == sunday.month:  # неделя внутри месяца — месяц пишется один раз
+        week = f"{monday.day} – {sunday.day} {MONTHS[sunday.month - 1]} {sunday.year}"
+    else:
+        week = f"{monday.day} {MONTHS[monday.month - 1]} – {sunday.day} {MONTHS[sunday.month - 1]} {sunday.year}"
     expect_period(calendar, week)
     expect(chip(calendar, event["title"])).to_contain_text("12:00")
     assert prefs(calendar)["view"] == "week"

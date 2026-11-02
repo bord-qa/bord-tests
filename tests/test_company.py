@@ -45,7 +45,9 @@ class CompanyForm:
         main = page.locator("main")
         field = lambda label: main.get_by_text(label, exact=True).locator("xpath=following-sibling::input")
         self.name = field("Название в BORD *")
-        self.industry = main.locator("button[aria-haspopup='listbox']")
+        # с 02.11 в форме вторая выпадашка — «Страна»; отрасль берём по подписи
+        self.industry = main.get_by_text("Отрасль", exact=True).locator(
+            "xpath=following::button[@aria-haspopup='listbox'][1]")
         self.legal_name = main.get_by_placeholder("Exemplu SRL")
         self.idno = main.get_by_placeholder("13 цифр")
         self.vat_code = field("Код НДС")
@@ -69,7 +71,8 @@ def company(page: Page) -> dict:
 @pytest.fixture
 def form(auth_page: Page):
     auth_page.goto("/admin/settings/company")
-    expect(auth_page).to_have_title("Компания — BORD")
+    # заголовок вкладки с 02.11 всегда «BORD» (баг заведён) — готовность ждём по форме
+    expect(auth_page.locator("main").get_by_text("Название в BORD")).to_be_visible(timeout=20_000)
     settle(auth_page)
     before = company(auth_page)
     yield CompanyForm(auth_page)

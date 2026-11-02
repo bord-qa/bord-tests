@@ -60,7 +60,6 @@ def revoke_bad_invites(page: Page):
 @pytest.fixture
 def wizard(auth_page: Page):
     auth_page.goto("/admin/onboarding")
-    expect(auth_page).to_have_title("Настройка компании — BORD")
     expect(step(auth_page, "1. Компания")).to_be_visible()
     settle(auth_page)
     before = company(auth_page)
@@ -119,7 +118,7 @@ def test_skip_buttons_lead_to_modules(wizard: Page, button: str):
         open_team(wizard)
     wizard.locator("main").get_by_role("button", name=button).click()
     expect(wizard).to_have_url("https://app.bord.one/admin/subscription")
-    expect(wizard).to_have_title("Модули и оплата — BORD")
+    expect(wizard.locator("header").first).to_contain_text("Модули и оплата")
 
 
 # Кейс: «Ещё коллега» добавляет строку, «Убрать» убирает

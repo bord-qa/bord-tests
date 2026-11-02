@@ -30,7 +30,7 @@ def tile_names(section):
 @pytest.fixture
 def start(auth_page: Page):
     auth_page.goto("/admin")
-    expect(auth_page).to_have_title(re.compile("Стартовая страница"))
+    expect(auth_page.locator("section[data-slot]").first).to_be_visible(timeout=20_000)
     settle(auth_page)
     return auth_page
 
@@ -97,12 +97,20 @@ def test_every_enabled_module_has_tile_with_link(start: Page, org_map, modules):
             expect(tile).to_have_attribute("target", "_blank")
 
 
+# Кейс: У раздела свой заголовок вкладки
+@pytest.mark.xfail(reason="bord-36: заголовок вкладки у всех разделов «BORD»", strict=True)
+@pytest.mark.parametrize("path, title", [("/admin/tasks", "Задачи"), ("/admin/settings/company", "Компания")])
+def test_section_tab_title(auth_page: Page, path, title):
+    auth_page.goto(path)
+    expect(auth_page).to_have_title(re.compile(f"^{title}"), timeout=10_000)
+
+
 # Кейс: Внутренняя плитка открывает раздел
 def test_internal_tile_opens_section(start: Page, org_map):
     start.locator("section[data-slot] a[href='/admin/tasks']").click()
 
     expect(start).to_have_url(re.compile(r"/admin/tasks$"))
-    expect(start).to_have_title(re.compile("Задачи"))
+    expect(start.locator("header").first).to_contain_text("Задачи")
 
 
 # Кейс: «Настроить» предлагает все шаблоны

@@ -428,13 +428,14 @@ def test_company_deal(companies: Page):
 
 
 # Кейс: «Создать задачу» из карточки — форма с компанией, задача видна на вкладке
+@pytest.mark.xfail(reason="bord-38: окно «Новая задача» открывается под карточкой компании — «Создать» не нажать", strict=True)
 def test_task_from_card(companies: Page):
     c = create_company(companies)
     panel = open_card(companies, c, "tasks")
     expect(panel.get_by_text("Нет связанных задач.")).to_be_visible()
     title = f"{QA_PREFIX} {tag()}"
 
-    panel.get_by_role("link", name="Создать задачу").click()
+    panel.get_by_role("button", name="Создать задачу").click()  # с 02.11 кнопка, раньше была ссылка
     window = companies.locator("div.fixed.inset-0").filter(has_text="Новая задача").last
     expect(window).to_contain_text(c["name"])
     window.get_by_placeholder(re.compile("^Необязательно")).fill(title)

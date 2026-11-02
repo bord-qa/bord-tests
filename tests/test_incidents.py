@@ -112,6 +112,12 @@ def open_card(page: Page, item: dict):
     settle(page)
 
 
+def delete_incident_button(page: Page):
+    """«Удалить» самого инцидента — текстовая кнопка; с 02.11 у строк хронологии и задач
+    по итогам есть свои иконки с aria-label «Удалить»."""
+    return page.locator("main").get_by_role("button", name="Удалить", exact=True).filter(has_text="Удалить")
+
+
 def section(page: Page, heading: str, button: str):
     """Блок карточки: заголовок и его кнопка («Добавить», «Улика»)."""
     return page.locator("main").get_by_text(heading, exact=True).locator(
@@ -244,7 +250,7 @@ def test_close_blocked_until_actions_done(incidents: Page):
     expect(timeline).to_contain_text("Статус: Локализован → Закрыт")
     incidents.reload()
     expect(incidents.locator("main").get_by_role("button", name="Изменить")).to_be_visible()
-    expect(incidents.locator("main").get_by_role("button", name="Удалить", exact=True)).to_have_count(0)
+    expect(delete_incident_button(incidents)).to_have_count(0)
 
 
 # Кейс: Закрытый инцидент не удаляется через API
@@ -423,13 +429,24 @@ def test_delete_open_incident(incidents: Page):
     item = create_incident(incidents)
     open_card(incidents, item)
 
-    incidents.locator("main").get_by_role("button", name="Удалить", exact=True).click()
+    delete_incident_button(incidents).click()
     dialog = incidents.get_by_role("dialog", name=re.compile("Удалить"))
     with incidents.expect_response(lambda r: r.url.endswith(f"{API}/{item['id']}") and r.request.method == "DELETE") as deleted:
         dialog.get_by_role("button", name=re.compile("^(Да|OK)$")).click()
 
     assert deleted.value.ok
     assert api_get(incidents, f"{API}/{item['id']}").status == 404
+
+
+# Кейс: Хронологию закрытого инцидента не переписать
+@pytest.mark.xfail(reason="bord-37: событие хронологии закрытого инцидента удаляется (200)", strict=True)
+@pytest.mark.writes_data
+def test_closed_incident_timeline_locked(incidents: Page):
+    item = create_incident(incidents)
+    assert api_post(incidents, f"{API}/{item['id']}/status", {"status": "closed", "note": "автотест"}).ok
+    events = incident(incidents, item["id"])["events"]
+    resp = api_delete(incidents, f"{API}/{item['id']}/events/{events[0]['id']}")
+    assert resp.status in (403, 409), f"событие закрытого инцидента удалилось: {resp.status}"
 
 
 # Кейс: Фильтры и поиск в списке
