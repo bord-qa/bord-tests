@@ -19,6 +19,7 @@
 Записи «QA Buyer …», «QA MDL», INV-2026-0001 и акты 30.10 завёл не автотест —
 их не меняем и не удаляем.
 """
+import datetime as dt
 import re
 
 from playwright.sync_api import APIResponse, Browser, Page, expect
@@ -185,3 +186,44 @@ def rail_open(page: Page, group: str):
     panel = page.locator("div.fixed[role=menu]")
     expect(panel).to_be_visible()
     return panel
+
+
+class Books:
+    """Свой маленький учёт за текущий месяц: статьи выручки (P&L 1100) и расхода (2200),
+    бизнес-линия, клиент, банк. счёт, отправленная накладная 500 (+НДС 0), завершённые
+    приход 500 и расход 120. cleanup() всё отменяет / удаляет / выключает (блоки 44, 48)."""
+
+    def __init__(self, page: Page):
+        self.page = page
+        tag = stamp()
+        today = dt.date.today()
+        self.tag = tag
+        self.income_cat = fx_json(fx_post(page, "/categories/", {"name": f"{QA_PREFIX} Выручка {tag}", "type": "income", "pls_type": 1100}))
+        self.expense_cat = fx_json(fx_post(page, "/categories/", {"name": f"{QA_PREFIX} Расход {tag}", "type": "expense", "pls_type": 2200}))
+        self.line = fx_json(fx_post(page, "/business-lines/", {"name": f"{QA_PREFIX} Отчёт {tag}"}))
+        self.cp = fx_json(fx_post(page, "/counterparties/", {"name": f"{QA_PREFIX} Отчёты {tag}", "type": "customer"}))
+        self.acc = fx_json(fx_post(page, "/bank-accounts/", {"name": f"{QA_PREFIX} Отчёты {tag}", "type": "bank", "currency": "MDL"}))
+        self.invoice = fx_json(fx_post(page, "/invoices/", {
+            "counterparty_id": self.cp["id"], "type": "receivable", "issue_date": str(today), "due_date": str(today + dt.timedelta(days=10)),
+            "currency": "MDL", "category_id": self.income_cat["id"], "business_line_id": self.line["id"],
+            "lines": [{"description": f"{QA_PREFIX} отчёты", "quantity": 1, "unit_price": 500, "category_id": self.income_cat["id"]}]}))
+        fx_json(fx_post(page, f"/invoices/{self.invoice['id']}/send", {}))
+        self.payments = []
+        for kind, amount, cat in (("income", 500, self.income_cat), ("expense", 120, self.expense_cat)):
+            pay = fx_json(fx_post(page, "/payments/", {
+                "type": kind, "amount": amount, "currency": "MDL", "date": str(today), "bank_account_id": self.acc["id"],
+                "counterparty_id": self.cp["id"] if kind == "income" else None, "category_id": cat["id"],
+                "business_line_id": self.line["id"], "description": f"{QA_PREFIX} отчёты {tag}"}))
+            fx_json(fx_post(page, f"/payments/{pay['id']}/complete", {}))
+            self.payments.append(pay)
+
+    def cleanup(self):
+        p = self.page
+        for pay in self.payments:
+            fx_delete(p, f"/payments/{pay['id']}")
+        fx_post(p, f"/invoices/{self.invoice['id']}/cancel", {})
+        fx_delete(p, f"/bank-accounts/{self.acc['id']}")
+        for cat in (self.income_cat, self.expense_cat):
+            fx_put(p, f"/categories/{cat['id']}", {"is_active": False})
+        fx_put(p, f"/business-lines/{self.line['id']}", {"is_active": False})
+        fx_put(p, f"/counterparties/{self.cp['id']}", {"is_active": False})

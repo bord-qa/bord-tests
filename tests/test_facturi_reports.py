@@ -27,7 +27,7 @@ import re
 import pytest
 from playwright.sync_api import Page, Response, expect
 
-from helpers.facturi import QA_PREFIX, fx_delete, fx_get, fx_json, fx_post, fx_put, open_fx, stamp
+from helpers.facturi import Books, open_fx
 
 pytestmark = pytest.mark.requires_auth
 
@@ -52,44 +52,6 @@ REPORTS = {
 def money(amount: float) -> str:
     whole, frac = f"{abs(amount):,.2f}".split(".")
     return r"\s".join(re.escape(p) for p in whole.split(",")) + f",{frac}"
-
-
-class Books:
-    """Свой маленький учёт за текущий месяц: накладная 500 (+НДС 0), приход 500, расход 120."""
-
-    def __init__(self, page: Page):
-        self.page = page
-        tag = stamp()
-        self.tag = tag
-        self.income_cat = fx_json(fx_post(page, "/categories/", {"name": f"{QA_PREFIX} Выручка {tag}", "type": "income", "pls_type": 1100}))
-        self.expense_cat = fx_json(fx_post(page, "/categories/", {"name": f"{QA_PREFIX} Расход {tag}", "type": "expense", "pls_type": 2200}))
-        self.line = fx_json(fx_post(page, "/business-lines/", {"name": f"{QA_PREFIX} Отчёт {tag}"}))
-        self.cp = fx_json(fx_post(page, "/counterparties/", {"name": f"{QA_PREFIX} Отчёты {tag}", "type": "customer"}))
-        self.acc = fx_json(fx_post(page, "/bank-accounts/", {"name": f"{QA_PREFIX} Отчёты {tag}", "type": "bank", "currency": "MDL"}))
-        self.invoice = fx_json(fx_post(page, "/invoices/", {
-            "counterparty_id": self.cp["id"], "type": "receivable", "issue_date": str(TODAY), "due_date": str(TODAY + dt.timedelta(days=10)),
-            "currency": "MDL", "category_id": self.income_cat["id"], "business_line_id": self.line["id"],
-            "lines": [{"description": f"{QA_PREFIX} отчёты", "quantity": 1, "unit_price": 500, "category_id": self.income_cat["id"]}]}))
-        fx_json(fx_post(page, f"/invoices/{self.invoice['id']}/send", {}))
-        self.payments = []
-        for kind, amount, cat in (("income", 500, self.income_cat), ("expense", 120, self.expense_cat)):
-            pay = fx_json(fx_post(page, "/payments/", {
-                "type": kind, "amount": amount, "currency": "MDL", "date": str(TODAY), "bank_account_id": self.acc["id"],
-                "counterparty_id": self.cp["id"] if kind == "income" else None, "category_id": cat["id"],
-                "business_line_id": self.line["id"], "description": f"{QA_PREFIX} отчёты {tag}"}))
-            fx_json(fx_post(page, f"/payments/{pay['id']}/complete", {}))
-            self.payments.append(pay)
-
-    def cleanup(self):
-        p = self.page
-        for pay in self.payments:
-            fx_delete(p, f"/payments/{pay['id']}")
-        fx_post(p, f"/invoices/{self.invoice['id']}/cancel", {})
-        fx_delete(p, f"/bank-accounts/{self.acc['id']}")
-        for cat in (self.income_cat, self.expense_cat):
-            fx_put(p, f"/categories/{cat['id']}", {"is_active": False})
-        fx_put(p, f"/business-lines/{self.line['id']}", {"is_active": False})
-        fx_put(p, f"/counterparties/{self.cp['id']}", {"is_active": False})
 
 
 @pytest.fixture
