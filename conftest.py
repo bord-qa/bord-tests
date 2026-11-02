@@ -72,5 +72,22 @@ def colleague_page(browser, colleague_state, browser_context_args):
     ctx.close()
 
 
+@pytest.fixture(scope="session")
+def fx_state(browser, auth_state, tmp_path_factory, browser_context_args):
+    """Сессия Facturi (app.facturi.md): вход кнопкой «BORD» один раз на прогон."""
+    from helpers.facturi import make_state
+    path = tmp_path_factory.mktemp("auth-facturi") / "state.json"
+    return make_state(browser, browser_context_args, auth_state, str(path))
+
+
+@pytest.fixture
+def fx_page(browser, fx_state, browser_context_args):
+    """Страница тест-учётки, уже вошедшей в Facturi (организация BORD QA)."""
+    ctx = browser.new_context(**browser_context_args, storage_state=fx_state)
+    page = ctx.new_page()
+    yield page
+    ctx.close()
+
+
 # Оформление отчёта (терминал, HTML, сводка в Actions) — отдельно, в reporting.py.
 pytest_plugins = ("reporting",)

@@ -1,0 +1,93 @@
+name: E2E Tests (app.facturi.md)
+
+# E2E прогон Facturi (app.facturi.md, блоки 38+ в README): только tests/test_facturi_*.py.
+# Вход — кнопкой «BORD» на форме Facturi из сессии app.bord.one той же тест-учёткой;
+# данные пишутся только в организацию BORD QA и убираются за собой.
+# Платформа app.bord.one — e2e.yml, CRM — e2e-crm.yml.
+on:
+  # Ночью, 04:00 UTC — после app.bord.one и CRM (очередь e2e-bord общая, не пересекаются).
+  schedule:
+    - cron: "0 4 * * *"
+  # Ручной запуск кнопкой в Actions. Дефолты повторяют ночной прогон.
+  workflow_dispatch:
+    inputs:
+      markers:
+        description: 'Выражение -m (пусто = вся суита без manual, как ночью)'
+        default: ''
+        required: false
+      paths:
+        description: 'Ограничить прогон путями (пусто = все tests/test_facturi_*.py)'
+        default: ''
+        required: false
+      k_filter:
+        description: 'Фильтр -k по именам тестов (пусто = без фильтра)'
+        default: ''
+        required: false
+
+# Два прогона одновременно мешали бы друг другу в BORD QA (тест смены пароля
+# меняет пароль общей учётки) — второй ждёт, пока закончится первый. Группа
+# общая с e2e.yml и e2e-crm.yml: системы BORD не идут одновременно.
+concurrency:
+  group: e2e-bord
+  cancel-in-progress: false
+
+jobs:
+  e2e-facturi:
+    # не ubuntu-latest: с 19.10.2026 это Ubuntu 26.04, а Playwright 1.50 там не ставит chromium
+    runs-on: ubuntu-24.04
+    # Локально блок 38 идёт ~4 мин; с ростом блоков — до ~20; 40 — запас.
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browser (chromium)
+        run: python -m playwright install --with-deps chromium
+
+      # Учётка — из секрета USERS_JSON (то же содержимое, что users.json
+      # локально; helpers/auth.py читает его из env). Нет секрета — тесты
+      # со входом скипнутся с понятным текстом.
+      - name: Run E2E tests
+        env:
+          USERS_JSON: ${{ secrets.USERS_JSON }}
+          MARKERS: ${{ inputs.markers }}
+          PATHS: ${{ inputs.paths }}
+          K_FILTER: ${{ inputs.k_filter }}
+        run: |
+          echo "Прогон Facturi: ${MARKERS:+-m \"$MARKERS\"}${MARKERS:-все тесты Facturi без manual}${PATHS:+ | пути: $PATHS}${K_FILTER:+ | -k $K_FILTER}"
+          # без явных путей — все тесты Facturi
+          python -m pytest --browser chromium \
+                 ${MARKERS:+-m "$MARKERS"} \
+                 ${PATHS:-tests/test_facturi_*.py} \
+                 ${K_FILTER:+-k "$K_FILTER"} \
+                 --timeout=180 \
+                 --screenshot=only-on-failure \
+                 --output=test-results \
+                 --html=report.html --self-contained-html \
+                 --css=assets/report.css
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-html-report-facturi
+          path: report.html
+          retention-days: 14
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-facturi
+          path: test-results/
+          retention-days: 7
