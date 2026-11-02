@@ -24,6 +24,7 @@ EXCHANGE = "https://app.bord.one/api/admin/sso/exchange?module=crm"
 # состоит живой человек (turcan.maxim@alsodev.com, ID 1244 — на нём стартовые
 # примеры), назначение на него уйдёт ему уведомлением.
 QA_PREFIX = "QA Autotest"
+QA_ORG = 42  # организация BORD QA
 
 
 def _sso(page: Page) -> dict:
@@ -71,6 +72,30 @@ def crm_patch(page: Page, path: str, data: dict) -> APIResponse:
 
 def crm_delete(page: Page, path: str) -> APIResponse:
     return page.request.delete(CRM + "/api/crm" + path, headers=_headers(page))
+
+
+def plugins_on(browser, state, context_args, *keys):
+    """Включить плагины на время блока и вернуть как было — для module-фикстуры
+    (`yield from plugins_on(...)`).
+
+    В BORD QA плагины выключены, а test_crm_menu сверяет меню дословно: включённый
+    навсегда плагин добавит пункты и уронит его. Организация проверяется перед
+    записью: переключатель действует на всю организацию (разрешено только в BORD QA).
+    """
+    ctx = browser.new_context(**context_args, storage_state=state)
+    page = ctx.new_page()
+    org = _sso(page)["current_org"]
+    assert org["id"] == QA_ORG, f"плагины включаем только в BORD QA, а вошли в {org}"
+    state_now = {p["plugin_key"]: p["is_enabled"] for p in crm_get(page, "/plugins/").json()}
+    turned = [k for k in keys if not state_now[k]]
+    for key in turned:
+        resp = crm_put(page, f"/plugins/{key}", {"is_enabled": True})
+        assert resp.ok, f"плагин {key} не включился: {resp.status} {resp.text()[:200]}"
+    yield
+    page._crm_sso = None  # блок идёт дольше, чем живёт токен
+    for key in turned:
+        crm_put(page, f"/plugins/{key}", {"is_enabled": False})
+    ctx.close()
 
 
 def sidebar(page: Page):
