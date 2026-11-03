@@ -3,8 +3,8 @@ name: E2E Tests (app.bord.one)
 # E2E прогон против прода app.bord.one. Данные тесты пишут только в организацию
 # BORD QA и убирают за собой. Public API (маркер manual) сюда не входит: каждый
 # прогон тратит токены, которые нельзя вернуть (ecom-100162).
-# Тесты CRM (tests/test_crm_*.py) и Facturi (tests/test_facturi_*.py) идут
-# отдельными прогонами — e2e-crm.yml и e2e-facturi.yml.
+# Тесты CRM (tests/test_crm_*.py), Facturi (tests/test_facturi_*.py) и HRM (tests/test_hrm_*.py) идут
+# отдельными прогонами — e2e-crm.yml, e2e-facturi.yml и e2e-hrm.yml.
 on:
   # Ночью, 03:00 UTC (06:00 Кишинёв летом, 05:00 зимой).
   schedule:
@@ -68,7 +68,7 @@ jobs:
           echo "Прогон: ${MARKERS:+-m \"$MARKERS\"}${MARKERS:-вся суита без manual}${PATHS:+ | пути: $PATHS}${K_FILTER:+ | -k $K_FILTER}"
           # без явных путей — вся суита, кроме CRM и Facturi (у них свои прогоны)
           IGNORE_CRM=""
-          [ -z "$PATHS" ] && IGNORE_CRM="--ignore-glob=tests/test_crm_*.py --ignore-glob=tests/test_facturi_*.py"
+          [ -z "$PATHS" ] && IGNORE_CRM="--ignore-glob=tests/test_crm_*.py --ignore-glob=tests/test_facturi_*.py --ignore-glob=tests/test_hrm_*.py"
           python -m pytest --browser chromium \
                  ${MARKERS:+-m "$MARKERS"} \
                  ${PATHS} ${IGNORE_CRM} \
