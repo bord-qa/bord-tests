@@ -35,8 +35,8 @@ jobs:
   e2e-hrm:
     # не ubuntu-latest: с 19.10.2026 это Ubuntu 26.04, а Playwright 1.50 там не ставит chromium
     runs-on: ubuntu-24.04
-    # Локально блоки 49–50 идут ~1 мин; с ростом блоков — до ~20; 40 — запас.
-    timeout-minutes: 40
+    # Блоки 49–72 (~164 теста): локально ~15 мин, в CI до ~30; 60 — запас.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
