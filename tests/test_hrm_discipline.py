@@ -6,10 +6,9 @@
   Активен, Действия»; «Добавить тип» → «Новый тип нарушения»: «Код» (tardiness), «Название», «Описание»,
   «Тяжесть по умолчанию» (Незначительное / Среднее / Серьёзное / Критическое), «Порядок» →
   POST /discipline/violation-types; в строке значки «Деактивировать / Редактировать / Удалить»;
-  «Удалить» → «Удалить тип "<название>"?» → «Да» — удаление мягкое: тип остаётся с is_active=false
-  (повторный DELETE ничего не меняет), код занят навсегда (409), каталог показывает только активные —
-  поэтому свои типы копятся неактивными с кодами из времени; занятый нарушениями тоже «удаляется»;
-  «Деактивировать» шлёт PUT {is_active:false}, сервер отвечает 200 и оставляет тип активным — bord-51;
+  «Удалить» → «Удалить тип "<название>"?» → «Да» — с 04.11 тип удаляется совсем (до этого удаление было
+  мягким: is_active=false, код занят навсегда); каталог показывает только активные;
+  «Деактивировать» шлёт PUT {is_active:false} → тип неактивен (bord-51 починен 04.11);
 - «Нарушения»: список слева (сотрудник, тяжесть, КОД типа, дата), «Создать» → «Новое нарушение»:
   «Сотрудник», «Тип нарушения» (подставляет тяжесть типа), «Тяжесть», «Дата инцидента» (сегодня),
   «Описание»; без сотрудника — «Выберите сотрудника.», без описания — «Заполните описание
@@ -151,14 +150,13 @@ def test_violation_type_crud(auth_page: Page, discipline):
         sure.get_by_role("button", name="Да", exact=True).click()
     assert gone.value.ok, gone.value.text()
     expect(row).to_have_count(0)
-    # удаление мягкое: тип остаётся неактивным (код занят навсегда), из каталога и активных пропадает — см. bord-51
-    assert get_type(auth_page, vt["id"])["is_active"] is False
+    # с 04.11 удаление настоящее: типа нет даже в списке с неактивными (раньше оставался is_active=false)
+    assert get_type(auth_page, vt["id"]) is None
     assert vt["id"] not in [t["id"] for t in hrm_json(hrm_get(auth_page, "/discipline/violation-types"))]
 
 
 # Кейс: «Деактивировать» тип нарушения — тип становится неактивным
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=True, reason="bord-51: PUT {is_active:false} отвечает 200, но тип остаётся активным")
 def test_violation_type_deactivate(auth_page: Page, vtype):
     open_hrm(auth_page, "/admin/discipline")
     tab(auth_page, "Типы нарушений")
@@ -231,7 +229,6 @@ def test_violation_create_and_cancel(auth_page: Page, person, vtype):
 
 # Кейс: «Редактировать нарушение» → «Сохранить» сохраняет правку
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=True, reason="bord-50: PUT нарушения с любой датой (форма всегда шлёт incident_date) → 500")
 def test_violation_edit(auth_page: Page, person, vtype):
     hrm_json(hrm_post(auth_page, "/discipline/violations/", {
         "employee_id": person["id"], "violation_type": vtype["code"], "violation_type_id": vtype["id"],

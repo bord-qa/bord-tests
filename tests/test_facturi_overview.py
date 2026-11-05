@@ -190,15 +190,18 @@ def test_inbox_matches_api(fx_page: Page):
     with fx_page.expect_response(lambda r: r.url.endswith("/api/inbox/")) as resp:
         open_fx(fx_page, "/admin/inbox")
     data = resp.value.json()
-    # в шапке два одинаковых заголовка со счётчиком (title «Инбокс»), видимый — один
-    expect(fx_page.locator("header [title='Инбокс']:visible")).to_have_text(re.compile(rf"Инбокс\s*{data['count']}$"))
+    # в шапке два одинаковых заголовка со счётчиком (title «Инбокс»), видимый — один; счётчик = число
+    # пунктов (проблем), а count в API — сумма случаев по пунктам («1 случай» + «2 случая» = 3, в шапке 2)
+    assert data["count"] == sum(it["count"] for it in data["items"]), data
+    expect(fx_page.locator("header [title='Инбокс']:visible")).to_have_text(re.compile(rf"Инбокс\s*{len(data['items'])}$"))
     if data["clean"]:
         expect(main(fx_page)).to_contain_text("Инбокс пуст")
         return
     for it in data["items"]:
         item = inbox_item(fx_page, it["title"])
         expect(item).to_contain_text(it["action"])
-        expect(item).to_contain_text(money(it["amount_mdl"]))
+        if it["amount_mdl"]:  # у пунктов без суммы («Документы ждут решения») сумма не выводится
+            expect(item).to_contain_text(money(it["amount_mdl"]))
         expect(item.get_by_role("link", name="Разобрать")).to_have_attribute("href", it["url"])
     first = data["items"][0]
     item = inbox_item(fx_page, first["title"])
@@ -223,7 +226,8 @@ def test_inbox_snooze_and_return(fx_page: Page):
         snoozed = main(fx_page).locator("div").filter(
             has=fx_page.get_by_role("heading", name=re.compile(r"^Отложено: \d+$"))).last
         expect(snoozed).to_contain_text(it["title"])
-        expect(snoozed).to_contain_text(f"отложено до {TODAY + dt.timedelta(days=7)}")
+        # с 04.11 дата по-человечески «11.11.2026» (раньше ISO «2026-11-11»)
+        expect(snoozed).to_contain_text(f"отложено до {(TODAY + dt.timedelta(days=7)):%d.%m.%Y}")
         assert it["kind"] in [s["kind"] for s in fx_json(fx_get(fx_page, "/inbox/"))["snoozed"]]
 
         with fx_page.expect_response(lambda r: f"/api/inbox/{it['kind']}/snooze" in r.url and r.request.method == "DELETE") as back:

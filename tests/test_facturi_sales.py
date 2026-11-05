@@ -1,8 +1,9 @@
 """Блок 41. Facturi — продажи: оферты, счета на оплату, акты, накладные, каталог, «Сделки».
 
 Снято 02.11.2026:
-- одна сущность под тремя именами: в меню «Оферты», на экране «Оценки» («Создать
-  оценку»), в окне «Оффер · создание», на «Сделках» этап «Оффер»;
+- одна сущность: с 04.11 везде «Офферы» (меню, заголовок экрана, кнопка «Создать
+  оффер»), в окне «Оффер · создание», на «Сделках» этап «Оффер» (раньше в меню
+  «Оферты», на экране «Оценки» / «Создать оценку»);
 - документы создаются в окне без заголовка — сверху подпись «<Документ> · создание»;
   позиции — строки «Название и описание / Кол-во / Ед. / Цена / [Скидка] / [НДС %] /
   Сумма» (колонки «Скидка» и «НДС %» включаются галочками), внизу «Без НДС / НДС /
@@ -157,7 +158,7 @@ def open_estimates(page: Page) -> dict:
 @pytest.mark.writes_data
 def test_estimate_create_via_form(fx_page: Page, docs):
     open_estimates(fx_page)
-    head(fx_page).get_by_role("button", name="Создать оценку", exact=True).click()
+    head(fx_page).get_by_role("button", name="Создать оффер", exact=True).click()
     form = doc_form(fx_page, "Оффер · создание")
     create = form.get_by_role("button", name="Создать", exact=True)
     expect(create).to_be_disabled()
@@ -389,7 +390,6 @@ def test_act_pdf(fx_page: Page, docs):
 
 
 # Кейс: Карточка акта — подписи и форматы как у остальных документов
-@pytest.mark.xfail(reason="bord-31: «Подитого:», дата ISO, суммы без копеек", strict=True)
 def test_act_panel_formats(fx_page: Page, docs):
     act = docs.act()
     open_fx(fx_page, f"/admin/acts?doc=act%3A{act['id']}")
@@ -434,7 +434,6 @@ def open_invoice(page: Page, inv: dict):
 
 
 # Кейс: Ссылка на накладную открывает одну карточку
-@pytest.mark.xfail(reason="bord-32: /admin/invoices?id=… открывает карточку дважды", strict=True)
 def test_invoice_link_opens_one_card(fx_page: Page, docs):
     inv = docs.invoice()
     open_fx(fx_page, f"/admin/invoices?id={inv['id']}")
@@ -531,7 +530,6 @@ def test_sale_stages(fx_page: Page, docs):
 
 
 # Кейс: Акт по продаже через API — суммы как в счёте
-@pytest.mark.xfail(reason="bord-30: POST /sales/{id}/act начисляет НДС дважды (1400 вместо 1200)", strict=True)
 def test_sale_act_api_totals(fx_page: Page, docs):
     est = docs.estimate()
     pi = docs.pi(estimate_id=est["id"])

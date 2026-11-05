@@ -35,7 +35,6 @@ pytestmark = pytest.mark.requires_auth
 
 PAGE = "/admin/crm/leads"
 FORMS = "/admin/crm/settings?tab=lead_forms"
-ROUTE_BUG = "bord-18: заявка не становится карточкой без правила, хотя у ключа выбрана стадия"
 PIPELINE = f"{QA_PREFIX} лиды блока"
 
 
@@ -362,7 +361,6 @@ def test_submit_with_rule_creates_lead(leads: Page, pipeline: dict):
 
 
 # Кейс: Ключ со стадией заводит карточку без правила автоматизации
-@pytest.mark.xfail(reason=ROUTE_BUG, strict=False)
 def test_route_works_without_rule(leads: Page, pipeline: dict):
     switch_rules_off(leads)
     form = make_form(leads, lead_status_id=pipeline["lead_ids"][0])

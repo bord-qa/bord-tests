@@ -189,7 +189,6 @@ def test_offboarding_template(auth_page: Page):
 
 # Кейс: Задача адаптации типа «Документ» сохраняет тип и шаблон документа
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=True, reason="bord-57: task_type document/tmc и привязка отбрасываются — задача становится «Обычной»")
 def test_onboarding_document_task(auth_page: Page, env):
     tpl = hrm_json(hrm_post(auth_page, "/onboard/templates", {"name": f"{QA_PREFIX} Адаптация документ {stamp()}",
                                                               "trigger_event": "manual"}))

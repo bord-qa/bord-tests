@@ -341,9 +341,15 @@ def test_onboarding_checklist_matches_api(reports: Page):
     if checklist["dismissed"]:
         pytest.skip("«С чего начать» скрыт в организации")
     items = checklist["items"]
+    done = sum(i["done"] for i in items)
+    if done == len(items):
+        # с 04.11 пройденный целиком чек-лист не рисуется (до этого висел «С чего начать 4 из 4»)
+        expect(reports.locator("main li a")).to_have_count(0)
+        expect(reports.locator("main")).not_to_contain_text(loose("С чего начать"), use_inner_text=True)
+        return
 
     expect(reports.locator("main")).to_contain_text(
-        loose(f"С чего начать {sum(i['done'] for i in items)} из {len(items)}"), use_inner_text=True)
+        loose(f"С чего начать {done} из {len(items)}"), use_inner_text=True)
     links = reports.locator("main li a")
     expect(links).to_have_count(len(items))
     for link, item in zip(links.all(), items):

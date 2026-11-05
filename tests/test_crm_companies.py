@@ -36,7 +36,6 @@ from helpers.crm import (CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, 
 pytestmark = pytest.mark.requires_auth
 
 PAGE = "/admin/crm/companies"
-CONTACT_COUNT_BUG = "bord-16: contact_count считает связи всей организации, а не компании"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -428,7 +427,6 @@ def test_company_deal(companies: Page):
 
 
 # Кейс: «Создать задачу» из карточки — форма с компанией, задача видна на вкладке
-@pytest.mark.xfail(reason="bord-38: окно «Новая задача» открывается под карточкой компании — «Создать» не нажать", strict=True)
 def test_task_from_card(companies: Page):
     c = create_company(companies)
     panel = open_card(companies, c, "tasks")
@@ -487,7 +485,13 @@ def test_archive_and_restore(companies: Page):
     assert crm_get(companies, f"/companies/{c['id']}").json()["is_active"] is False
 
     companies.locator("main").get_by_role("button", name="Архив", exact=True).click()
+    # архив копит компании тестов (удалить нельзя), страница — 25 по алфавиту: своя ищется поиском,
+    # иначе со случайным именем ближе к концу алфавита она уезжает на вторую страницу
+    with companies.expect_response(lambda r: "/api/crm/companies/" in r.url and "search=" in r.url
+                                   and "is_active=false" in r.url):
+        search(companies).fill(c["name"])
     archived = row(companies, c["name"])
+    expect(archived).to_have_count(1)
     with companies.expect_response(lambda r: f"/api/crm/companies/{c['id']}" in r.url
                                    and r.request.method in ("PUT", "PATCH", "POST")) as resp:
         archived.get_by_role("button", name="Вернуть из архива").click()
@@ -516,7 +520,6 @@ def test_archive_cancel(companies: Page):
 
 
 # Кейс: Счётчик контактов считает только контакты самой компании
-@pytest.mark.xfail(reason=CONTACT_COUNT_BUG, strict=False)
 def test_contact_count_is_per_company(companies: Page):
     linked, untouched = create_company(companies), create_company(companies)
     link(companies, linked, create_contact(companies))

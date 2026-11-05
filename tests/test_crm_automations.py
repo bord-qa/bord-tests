@@ -44,10 +44,6 @@ from helpers.crm import QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_pu
 pytestmark = pytest.mark.requires_auth
 
 PAGE = "/admin/crm/automations"
-CREATED_BUG = "bord-1: триггер «Сделка создана» не срабатывает: включённое правило не видит новую сделку (ни из формы, ни из API)"
-DELETE_BUG = "bord-2: «Удалить» («Действие необратимо») только выключает правило — оно остаётся в списке и в API"
-RUN_INACTIVE_BUG = ("bord-3: «Выполнить сейчас» у выключенного правила → «Правило не отработало: rule inactive», "
-                    "хотя форма советует проверять так выключенное правило перед включением")
 
 
 def tag() -> str:
@@ -117,11 +113,12 @@ def runs(page: Page, rule: dict) -> list[dict]:
 
 
 def wait_run(page: Page, rule: dict, deal: dict, timeout: float = 20) -> dict | None:
-    """Запуск правила по сделке — правила выполняются в фоне, ждём до timeout секунд."""
+    """Запуск правила по сделке — правила выполняются в фоне, ждём до timeout секунд.
+    Запись появляется сразу со status=pending (с 04.11) — ждём итоговый статус."""
     end = time.monotonic() + timeout
     while True:
         found = next((r for r in runs(page, rule) if r["entity_id"] == deal["id"]), None)
-        if found or time.monotonic() > end:
+        if (found and found["status"] != "pending") or time.monotonic() > end:
             return found
         page.wait_for_timeout(1000)
 
@@ -375,8 +372,8 @@ def run_now(page: Page, rule: dict):
 # Кейс: «Выполнить сейчас» — предупреждение «по-настоящему», задача по последней подходящей сделке, «История запусков»
 def test_run_now_and_history(automations: Page):
     amount = unique_amount()
-    # «Сделка создана» само не срабатывает (см. CREATED_BUG); если починят —
-    # задача заведётся раньше, а повтор её не задвоит
+    # «Сделка создана» срабатывает и само — фоновым свипом через ~20 с (bord-1); если свип
+    # успеет раньше «Выполнить сейчас», повтор задачу не задвоит
     rule = make_rule(automations, amount, event="created", active=True)
     deal = make_deal(automations, amount)
     open_automations(automations)
@@ -402,7 +399,6 @@ def test_run_now_and_history(automations: Page):
 
 
 # Кейс: «Выполнить сейчас» у выключенного правила — проверка перед включением, как советует форма
-@pytest.mark.xfail(reason=RUN_INACTIVE_BUG, strict=False)
 def test_run_now_inactive_rule(automations: Page):
     amount = unique_amount()
     rule = make_rule(automations, amount, event="created")
@@ -444,19 +440,18 @@ def test_edit_rule(automations: Page):
 
 
 # Кейс: Включённое правило «Сделка создана» ставит задачу по новой сделке
-@pytest.mark.xfail(reason=CREATED_BUG, strict=False)
 def test_rule_fires_on_deal_created(automations: Page):
     amount = unique_amount()
     rule = make_rule(automations, amount, event="created", active=True)
     deal = make_deal(automations, amount)
 
-    run = wait_run(automations, rule, deal)
+    # «Сделка создана» рождает фоновый свип (bord-1, починено 03.11), а не сама форма: ~20 с, бывает дольше
+    run = wait_run(automations, rule, deal, timeout=90)
     assert run and run["status"] == "success", f"правило не сработало на новой сделке {deal['id']}"
     assert [t["title"] for t in deal_tasks(automations, deal)] == [f"{QA_PREFIX} звонок по {deal['title']}"]
 
 
 # Кейс: «Удалить» правило — подтверждение «Действие необратимо», правило пропадает из списка и API
-@pytest.mark.xfail(reason=DELETE_BUG, strict=False)
 def test_delete_rule(automations: Page):
     rule = make_rule(automations, unique_amount())
     open_automations(automations)

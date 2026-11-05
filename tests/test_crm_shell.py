@@ -5,8 +5,9 @@
   «BORD QA · enterprise» и кнопка пользователя «maxim.turcan1»;
 - меню слева: Работа (Сделки, Клиенты, Задачи, Календарь), Настройка (Рабочие
   процессы, Автоматизации), Аналитика (Отчёты, Отчёт по времени, Мониторинг),
-  Администрирование (Баланс ИИ-анализа, Команда, Настройки, Плагины,
-  Документация → help.bord.one/crm/). Разделы плагинов (Лиды, Компании,
+  Администрирование (Оплата и подписки → app.bord.one/admin/subscription/billing
+  в новой вкладке — с 04.11 вместо «Баланс ИИ-анализа», старый /admin/crm/wallet
+  уводит туда же; Команда, Настройки, Плагины, Документация → help.bord.one/crm/). Разделы плагинов (Лиды, Компании,
   Проекты, Бронирование…) в BORD QA выключены и в меню не видны;
 - заголовок вкладки — «<Раздел> · BORD CRM»;
 - язык RU/RO/EN внизу меню → PUT /api/crm/user-prefs/me {ui_lang} (хранится
@@ -30,12 +31,13 @@ SECTIONS = {
     "/admin/crm/reports": "Отчёты",
     "/admin/crm/time-report": "Отчёт по времени",
     "/admin/crm/monitoring": "Мониторинг",
-    "/admin/crm/wallet": "Баланс ИИ-анализа",
     "/admin/crm/team": "Команда",
     "/admin/crm/settings": "Настройки",
     "/admin/plugins": "Плагины",
 }
-MENU = list(SECTIONS.values()) + ["Документация"]
+BILLING = "https://app.bord.one/admin/subscription/billing"
+_names = list(SECTIONS.values())
+MENU = _names[:_names.index("Команда")] + ["Оплата и подписки"] + _names[_names.index("Команда"):] + ["Документация"]
 
 
 # Кейс: CRM открывается из сессии BORD с организацией BORD QA
@@ -58,6 +60,7 @@ def test_crm_menu(auth_page: Page):
     expect(links).to_have_text(MENU)
     expect(sidebar(auth_page).get_by_role("link", name="Документация")).to_have_attribute(
         "href", "https://help.bord.one/crm/")
+    expect(sidebar(auth_page).get_by_role("link", name="Оплата и подписки")).to_have_attribute("href", BILLING)
 
 
 # Кейс: Раздел CRM открывается без ошибок API

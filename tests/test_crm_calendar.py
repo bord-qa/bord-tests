@@ -46,14 +46,13 @@ PAGE = "/admin/calendar"
 PREFS = "/user-prefs/me/calendar-filters"
 DEFAULT_PREFS = {"mine": False, "layers": {"events": True, "tasks": True, "reminders": True},
                  "task_statuses": ["new", "in_progress", "on_hold", "canceled"], "view": "month"}
-MINE_RACE_BUG = ("bord-6: запрос задач без responsible_id, ушедший до применения «Мои», иногда отвечает последним "
-                 "и перезаписывает доску — при активной «Мои» видны чужие и неназначенные задачи")
-NAV_RACE_BUG = ("bord-7: «›» сразу после открытия — ответ за прошлый месяц перезаписывает сетку, "
-                "событий нового месяца не видно")
 # Три запроса, из которых собирается сетка: ждём все, прежде чем смотреть на неё.
 LOADS = ("/api/crm/calendar/events?", "/api/crm/tasks/?due_from", "/api/crm/reminders/?from_dt")
 MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь",
           "Октябрь", "Ноябрь", "Декабрь"]
+# с 04.11 в неделе, дне и окне дня месяц в родительном падеже («2 – 8 ноября 2026», «5 ноября 2026, чт»)
+MONTHS_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября",
+              "октября", "ноября", "декабря"]
 WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
 
@@ -192,9 +191,9 @@ def overlay(page: Page, text: str):
 
 
 def expect_period(page: Page, text: str):
-    """Шапка периода. В DOM месяц строчными («26 октябрь – 1 ноябрь 2026»),
-    заглавные дорисовывает CSS capitalize — сверяем без учёта регистра."""
-    period = page.locator("main div.capitalize.whitespace-nowrap")
+    """Шапка периода («Ноябрь 2026», «26 октября – 1 ноября 2026»). Регистр сверяем без учёта:
+    до 04.11 месяц был строчным в DOM и заглавным через CSS capitalize, теперь класса нет."""
+    period = page.locator("main div.font-semibold.whitespace-nowrap")
     expect(period).to_have_text(re.compile(rf"^{re.escape(text)}$", re.IGNORECASE))
 
 
@@ -373,7 +372,7 @@ def test_add_on_day(calendar: Page):
     reload_calendar(calendar)
     day_number(chip(calendar, task["title"])).click()
     popup = overlay(calendar, "Добавить на этот день")
-    expect(popup).to_contain_text(f"{day.day} {MONTHS[day.month - 1].lower()} {day.year}")
+    expect(popup).to_contain_text(f"{day.day} {MONTHS_GEN[day.month - 1]} {day.year}")
     expect(popup).to_contain_text(task["title"])
 
     popup.get_by_role("button", name="Добавить на этот день").click()
@@ -392,9 +391,9 @@ def test_week_and_day_views(calendar: Page):
     with prefs_saved(calendar):
         view_button(calendar, "Неделя").click()
     if monday.month == sunday.month:  # неделя внутри месяца — месяц пишется один раз
-        week = f"{monday.day} – {sunday.day} {MONTHS[sunday.month - 1]} {sunday.year}"
+        week = f"{monday.day} – {sunday.day} {MONTHS_GEN[sunday.month - 1]} {sunday.year}"
     else:
-        week = f"{monday.day} {MONTHS[monday.month - 1]} – {sunday.day} {MONTHS[sunday.month - 1]} {sunday.year}"
+        week = f"{monday.day} {MONTHS_GEN[monday.month - 1]} – {sunday.day} {MONTHS_GEN[sunday.month - 1]} {sunday.year}"
     expect_period(calendar, week)
     expect(chip(calendar, event["title"])).to_contain_text("12:00")
     assert prefs(calendar)["view"] == "week"
@@ -402,7 +401,7 @@ def test_week_and_day_views(calendar: Page):
     expect_period(calendar, week)
 
     view_button(calendar, "День").click()
-    expect_period(calendar, f"{day.day} {MONTHS[day.month - 1]} {day.year}, {WEEKDAYS[day.weekday()]}")
+    expect_period(calendar, f"{day.day} {MONTHS_GEN[day.month - 1]} {day.year}, {WEEKDAYS[day.weekday()]}")
     expect(chip(calendar, event["title"])).to_contain_text("12:00")
 
     view_button(calendar, "Месяц").click()
@@ -410,7 +409,6 @@ def test_week_and_day_views(calendar: Page):
 
 
 # Кейс: Листание месяцев — вперёд, назад, «Сегодня»; событие следующего месяца видно только там
-@pytest.mark.xfail(reason=NAV_RACE_BUG, strict=False)
 def test_navigation(calendar: Page):
     day = today(calendar)
     next_month = (day.replace(day=1) + dt.timedelta(days=32)).replace(day=15)
@@ -460,7 +458,6 @@ def test_task_status_filter(calendar: Page):
 
 
 # Кейс: «Мои» прячет чужие и неназначенные задачи, «Все» возвращает
-@pytest.mark.xfail(reason=MINE_RACE_BUG, strict=False)
 def test_mine_and_all(calendar: Page):
     task = create_task(calendar, today(calendar), responsible_id=None)
     reload_calendar(calendar)

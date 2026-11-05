@@ -172,7 +172,6 @@ def test_onboarding_template_and_process(auth_page: Page, person):
 
 
 # Кейс: «Запустить онбординг» — сотрудники в выпадашке подписаны своими именами
-@pytest.mark.xfail(strict=True, reason="bord-54: варианты «undefined null (bodeho2831)», «undefined (QA Autotest …)»")
 def test_onboarding_employee_options(auth_page: Page, person):
     open_hrm(auth_page, "/admin/onboarding")
     main(auth_page).get_by_role("button", name="Запустить онбординг").click()
@@ -186,7 +185,6 @@ def test_onboarding_employee_options(auth_page: Page, person):
 
 # Кейс: «Удалить» шаблон адаптации с задачами → «Подтвердите удаление» → шаблон удалён
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=True, reason="bord-52: DELETE шаблона с задачами → 500, окно подтверждения висит")
 def test_onboarding_template_delete(auth_page: Page, dev):
     name = f"{QA_PREFIX} Шаблон удаление {stamp()}"
     tpl = hrm_json(hrm_post(auth_page, "/onboard/templates", {"name": name, "trigger_event": "manual"}))
@@ -314,7 +312,6 @@ def test_training_program_enroll(auth_page: Page, person):
 
 # Кейс: «Тип» программы обучения сохраняется таким, как выбран в форме
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=True, reason="bord-53: форма шлёт type, сервер ждёт training_type — тип всегда course")
 def test_training_program_type(auth_page: Page, dev):
     title = f"{QA_PREFIX} Курс тип {stamp()}"
     open_hrm(auth_page, "/admin/training")

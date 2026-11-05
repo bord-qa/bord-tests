@@ -98,7 +98,6 @@ def test_every_enabled_module_has_tile_with_link(start: Page, org_map, modules):
 
 
 # Кейс: У раздела свой заголовок вкладки
-@pytest.mark.xfail(reason="bord-36: заголовок вкладки у всех разделов «BORD»", strict=True)
 @pytest.mark.parametrize("path, title", [("/admin/tasks", "Задачи"), ("/admin/settings/company", "Компания")])
 def test_section_tab_title(auth_page: Page, path, title):
     auth_page.goto(path)

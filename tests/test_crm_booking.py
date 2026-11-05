@@ -28,8 +28,6 @@ from helpers.crm import (CRM, QA_PREFIX, crm_delete, crm_get, crm_post, crm_put,
 pytestmark = pytest.mark.requires_auth
 
 VENUES = "/admin/crm/venues"
-PLUGIN_ERROR = "bord-19: без Syrve сырой текст сервера и ложное «Нет заведений»"
-SLUG_ERROR = "bord-19: занятый slug — ошибка по-английски"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -167,7 +165,6 @@ def test_duplicate_slug_refused(booking: Page):
 
 
 # Кейс: Ошибка занятого адреса написана по-русски
-@pytest.mark.xfail(reason=SLUG_ERROR, strict=False)
 def test_duplicate_slug_message_is_russian(booking: Page):
     existing = create_venue(booking)
     window = new_form(booking)
@@ -296,7 +293,6 @@ def test_program_in_prices(booking: Page):
 
 
 # Кейс: Без плагина Syrve экран объясняет причину по-русски и не пишет «Нет заведений»
-@pytest.mark.xfail(reason=PLUGIN_ERROR, strict=False)
 def test_booking_without_syrve(booking: Page):
     create_venue(booking)
     assert crm_put(booking, "/plugins/syrve", {"is_enabled": False}).ok

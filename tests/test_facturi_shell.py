@@ -57,7 +57,7 @@ MENU = [
     ("Акты сверки", "/admin/reconciliation-acts"),
     ("Кредиты", "/admin/credits"),
     ("Сделки", "/admin/sales"),
-    ("Оферты", "/admin/estimates"),
+    ("Офферы", "/admin/estimates"),  # до 04.11 — «Оферты»
     ("Счета на оплату", "/admin/payment-invoices"),
     ("Акты", "/admin/acts"),
     ("Накладные", "/admin/invoices"),

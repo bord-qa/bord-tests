@@ -161,7 +161,6 @@ def test_paid_training_deductions(auth_page: Page, person):
 
 # Кейс: «Удержания» показывают сотрудника и месяц, «Обязательства» — действующее не «Срок истёк»
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=True, reason="bord-56: в «Удержаниях» пустые сотрудник и дата, действующее обязательство — «Срок истёк»")
 def test_deductions_and_obligations_tabs(auth_page: Page, person):
     title = f"{QA_PREFIX} Курс вкладки {stamp()}"
     paid_course(auth_page, person["id"], title)

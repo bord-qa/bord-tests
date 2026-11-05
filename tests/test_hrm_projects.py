@@ -73,7 +73,9 @@ def create_project_via_form(page: Page, team: dict, name: str) -> dict:
 
 # Кейс: Проекты = API (пусто — «Ещё нет проектов»)
 def test_list_matches_api(auth_page: Page):
-    with auth_page.expect_response(lambda r: "/api/hrm/projects" in r.url and r.request.method == "GET") as resp:
+    # точный путь: экран ещё зовёт /api/hrm/projects/assignable-employees (сотрудники, не проекты)
+    with auth_page.expect_response(lambda r: r.url.split("?")[0].rstrip("/").endswith("/api/hrm/projects")
+                                   and r.request.method == "GET") as resp:
         open_hrm(auth_page, "/admin/projects")
     projects = items(resp.value.json())
     if not projects:

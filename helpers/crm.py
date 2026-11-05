@@ -93,9 +93,13 @@ def plugins_on(browser, state, context_args, *keys):
         assert resp.ok, f"плагин {key} не включился: {resp.status} {resp.text()[:200]}"
     yield
     page._crm_sso = None  # блок идёт дольше, чем живёт токен
+    left_on = []
     for key in turned:
-        crm_put(page, f"/plugins/{key}", {"is_enabled": False})
+        resp = crm_put(page, f"/plugins/{key}", {"is_enabled": False})
+        if not resp.ok:  # молча оставленный плагин потом роняет test_crm_menu лишними пунктами меню
+            left_on.append(f"{key}: {resp.status} {resp.text()[:200]}")
     ctx.close()
+    assert not left_on, "плагины не выключились после блока:\n" + "\n".join(left_on)
 
 
 def sidebar(page: Page):

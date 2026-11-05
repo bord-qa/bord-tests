@@ -29,7 +29,6 @@ from helpers.crm import CRM, QA_PREFIX, crm_delete, crm_get, crm_post, open_crm,
 pytestmark = pytest.mark.requires_auth
 
 PAGE = "/admin/crm/channels"
-DELIVERY_BUG = "bord-20: ответ в webchat помечается «не доставлено», хотя посетитель его получил"
 PUBLIC = f"{CRM}/api/crm/public/webchat"
 
 
@@ -191,7 +190,6 @@ def test_reply_reaches_visitor(chat: Page, channel: dict):
 
 
 # Кейс: Дошедший ответ не помечается «не доставлено»
-@pytest.mark.xfail(reason=DELIVERY_BUG, strict=False)
 def test_reply_not_marked_failed(chat: Page, channel: dict):
     visitor = Visitor(chat, channel)
     sent = visitor.say(f"{QA_PREFIX} {tag()}")

@@ -173,7 +173,6 @@ def test_absence_summary(fx_page: Page, pay):
 
 
 # Кейс: «Новое отсутствие» — сотрудник из «Сотрудников» есть в выпадашке
-@pytest.mark.xfail(reason="bord-35: выпадашка берёт /salary/employees → [], сотрудников из «Сотрудников» нет", strict=True)
 def test_absence_form_lists_staff(fx_page: Page, pay):
     open_fx(fx_page, "/admin/salary/absences")
     fx_page.locator("main").get_by_role("button", name="Сотрудник…").click()

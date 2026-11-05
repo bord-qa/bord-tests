@@ -193,7 +193,6 @@ def test_timesheet_fill_month_one_employee(auth_page: Page, person):
 
 # Кейс: «Заполнить по норме» весь список за текущий месяц
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=False, reason="bord-55: /bulk-fill → 500 из-за ячейки Maxim Țurcan 02.11.2026 (strict=False — по починке/в другом месяце пройдёт)")
 def test_timesheet_fill_norm_all(auth_page: Page, person):
     open_hrm(auth_page, "/admin/timesheet")
     main(auth_page).get_by_role("button", name="Заполнить по норме", exact=True).click()

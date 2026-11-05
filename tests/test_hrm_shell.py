@@ -93,7 +93,6 @@ def test_menu_items_open(auth_page: Page):
 
 
 # Кейс: Заголовок вкладки следует за меню — «<Пункт> — BORD HRM»
-@pytest.mark.xfail(strict=False, reason="bord-44: примерно в 1 переходе из 10 заголовок вкладки остаётся «BORD HRM»")
 def test_menu_tab_titles(auth_page: Page):
     open_hrm(auth_page, "/admin/employees")
     stuck = []

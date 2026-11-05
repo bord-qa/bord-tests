@@ -439,7 +439,6 @@ def test_delete_open_incident(incidents: Page):
 
 
 # Кейс: Хронологию закрытого инцидента не переписать
-@pytest.mark.xfail(reason="bord-37: событие хронологии закрытого инцидента удаляется (200)", strict=True)
 @pytest.mark.writes_data
 def test_closed_incident_timeline_locked(incidents: Page):
     item = create_incident(incidents)

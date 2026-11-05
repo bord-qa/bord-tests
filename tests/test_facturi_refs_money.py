@@ -162,7 +162,6 @@ def test_bank_account_edit(fx_page: Page, bank_accounts):
 
 
 # Кейс: Фильтр типа счёта «Касса»
-@pytest.mark.xfail(reason="bord-28: API /bank-accounts/ игнорирует type — фильтр показывает все счета", strict=True)
 def test_bank_account_type_filter(fx_page: Page, bank_accounts):
     cash = bank_accounts(type="cash")
     bank = bank_accounts(type="bank")

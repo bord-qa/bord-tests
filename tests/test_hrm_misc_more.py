@@ -107,7 +107,6 @@ def test_tmc_lost_status(auth_page: Page, person):
 
 # Кейс: Утерянная позиция не числится возвращённой
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=True, reason="bord-58: у утерянной lifecycle_status=returned, returned_quantity = выданному, «возвращён полностью»")
 def test_tmc_lost_not_returned(auth_page: Page, person):
     t = issue_item(auth_page, person["id"], 2)
     hrm_json(hrm_patch(auth_page, f"/tmc/issues/{t['issue']['id']}/status", {"status": "lost", "status_reason": f"{QA_PREFIX} утеря"}))
@@ -212,7 +211,6 @@ def test_report_builder_filter_and_save(auth_page: Page, person):
 
 # Кейс: Фильтр конструктора по «ФИО» находит сотрудника по части имени
 @pytest.mark.writes_data
-@pytest.mark.xfail(strict=True, reason="bord-59: фильтр full_name в /report-builder/query всегда 0")
 def test_report_builder_fio_filter(auth_page: Page, person):
     r = hrm_json(hrm_post(auth_page, "/report-builder/query", {
         "filters": [{"key": "full_name", "op": "contains", "value": person["telegram_first_name"]}],
