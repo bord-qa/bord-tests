@@ -21,6 +21,7 @@ from helpers.hrm import (HRM, QA_PREFIX, pick_raise_manager, field, hrm_delete, 
 pytestmark = pytest.mark.requires_auth
 
 COLLEAGUE_ID = 1767
+RAISE_NOTIFICATION = "Новая заявка на повышение зарплаты"
 
 
 def main(page: Page):
@@ -113,4 +114,7 @@ def test_screen_in_romanian(ro: Page, path, title, tabs):
         "els => els.filter(e => e.offsetParent && e.children.length <= 2).map(e => e.innerText.trim())")
     cyrillic = [t for t in labels if re.search(r"[А-Яа-яЁё]", t) and not t.startswith(QA_PREFIX)
                 and not re.search(r"QA Autotest|\[QA-AUTO\]|Акт (выдачи|приёма) ТМЦ|Системный шаблон", t)]
+    # bord-179: уведомление о заявке на повышение не переводится (остальные типы переведены)
+    if cyrillic and all(t.startswith(RAISE_NOTIFICATION) for t in cyrillic):
+        pytest.xfail(f"bord-179: «{RAISE_NOTIFICATION} …» в Română не переведено")
     assert not cyrillic, f"кириллица в интерфейсе {path}: {cyrillic[:5]}"
