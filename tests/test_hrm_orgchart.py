@@ -71,8 +71,15 @@ def test_tree_matches_api(auth_page: Page):
     for dep in tree["departments"]:
         expect(main(auth_page).get_by_text(dep["name"], exact=True).first).to_be_visible()
     expect(main(auth_page)).to_contain_text(f"{len(tree['unassigned'])} без отдела")
+    # блок рисуется только у юрлица, на которое ссылаются отделы или люди: пустые юрлица
+    # (например, заведённые ручной проверкой) на схеме не показываются — только в фильтре
+    used = {d["legal_entity_id"] for d in tree["departments"]} | {u["legal_entity_id"] for u in tree["unassigned"]}
     for le in items(hrm_json(hrm_get(auth_page, "/legal-entities"))):
-        expect(main(auth_page).get_by_role("button").filter(has_text=le["name"]).first).to_be_visible()
+        block = main(auth_page).get_by_role("button").filter(has_text=le["name"])
+        if le["id"] in used:
+            expect(block.first, le["name"]).to_be_visible()
+        else:
+            expect(block, le["name"]).to_have_count(0)
 
 
 # Кейс: Вид «По проектам» строится по /org/by-projects, назад — «По департаментам»

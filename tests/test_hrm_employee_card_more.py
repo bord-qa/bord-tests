@@ -82,7 +82,9 @@ def test_employee_files(auth_page: Page, person, tmp_path):
     open_card(auth_page, person, "Файлы")
     expect(main(auth_page)).to_contain_text("Нет файлов")
     with auth_page.expect_response(lambda r: f"/employees/{person['id']}/files" in r.url and r.request.method == "POST") as up:
-        main(auth_page).locator("input[type=file][multiple]").first.set_input_files(str(doc))  # первое поле — фото
+        # с 08.11 над «Файлами» — «Папка на Диске» со своим полем «На Диск» (туда не грузим):
+        # поле «Загрузить файлы» — последнее из множественных (первое поле карточки — фото)
+        main(auth_page).locator("input[type=file][multiple]").last.set_input_files(str(doc))
     assert up.value.ok, up.value.text()
     [f] = hrm_json(hrm_get(auth_page, f"/employees/{person['id']}/files")) if isinstance(
         hrm_json(hrm_get(auth_page, f"/employees/{person['id']}/files")), list) else \
