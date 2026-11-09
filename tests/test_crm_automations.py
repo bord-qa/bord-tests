@@ -240,6 +240,19 @@ def test_create_disabled_until_filled(automations: Page):
 
 # Кейс: Действие недоступного плагина в списке выключено («нужен плагин «Проекты»»)
 def test_unavailable_action_disabled(automations: Page):
+    # плагин «Проекты» в BORD QA бывает включён вручную — на время теста выключаем и возвращаем
+    plugins = {p["plugin_key"]: p["is_enabled"] for p in crm_get(automations, "/plugins/").json()}
+    if plugins.get("projects"):
+        assert crm_put(automations, "/plugins/projects", {"is_enabled": False}).ok
+        try:
+            _check_unavailable_action(automations)
+        finally:
+            assert crm_put(automations, "/plugins/projects", {"is_enabled": True}).ok, "плагин «Проекты» не вернулся"
+    else:
+        _check_unavailable_action(automations)
+
+
+def _check_unavailable_action(automations: Page):
     open_automations(automations)
     form = new_rule_form(automations)
     form.get_by_role("button", name="Выберите событие").click()

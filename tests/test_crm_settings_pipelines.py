@@ -162,7 +162,8 @@ def stage_row(card, name: str):
 
 
 def counter(page: Page, n: int):
-    return page.locator("main").get_by_text(f"{n} воронок", exact=True)
+    # с 08.11 к числу дописано число скрытых: «2 воронок · 1 скрыто»
+    return page.locator("main").get_by_text(re.compile(rf"^{n} воронок( · \d+ скрыто)?$"))
 
 
 # Кейс: Воронки на экране = API — счётчик, названия, статусы основной воронки по порядку с отметками

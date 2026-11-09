@@ -115,7 +115,8 @@ def send_reply(page: Page, dialog_id: int, text: str):
 # Кейс: Плагин включён — в меню «Входящие» и «Все переписки»
 def test_menu_items(chat: Page):
     menu = sidebar(chat)
-    expect(menu.get_by_role("link", name="Входящие", exact=True)).to_be_visible()
+    # с 08.11 в пункте счётчик непрочитанных: «Входящие 30»
+    expect(menu.get_by_role("link", name=re.compile(r"^Входящие(\s*\d+)?$"))).to_be_visible()
     expect(menu.get_by_role("link", name="Все переписки", exact=True)).to_be_visible()
 
 

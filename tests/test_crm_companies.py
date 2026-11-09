@@ -136,7 +136,8 @@ def name_field(scope):
 
 
 def vat_field(scope):
-    return scope.get_by_placeholder("1234567890")
+    # с 08.11 плейсхолдер «IDNO, 13 цифр — остальное из госреестра» — берём по подписи
+    return scope.get_by_text("ИНН / VAT (фискальный код)", exact=True).locator("xpath=following-sibling::input[1]")
 
 
 def card(page: Page):

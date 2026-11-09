@@ -13,6 +13,8 @@
 - язык RU/RO/EN внизу меню → PUT /api/crm/user-prefs/me {ui_lang} (хранится
   на сервере у пользователя, поэтому тест возвращает RU в любом исходе).
 """
+import re
+
 import pytest
 from playwright.sync_api import Page, Response, expect
 
@@ -57,7 +59,14 @@ def test_crm_menu(auth_page: Page):
     open_crm(auth_page)
 
     links = sidebar(auth_page).locator("nav a")
-    expect(links).to_have_text(MENU)
+    # с 08.11 «Входящие» — первый пункт ядра, со счётчиком непрочитанных («Входящие36»);
+    # плагин «Проекты», если он включён в BORD QA, добавляет «Проекты» и «Нагрузка»
+    menu = [re.compile(r"^Входящие\d*$")] + MENU
+    plugins = {p["plugin_key"]: p["is_enabled"] for p in crm_get(auth_page, "/plugins/").json()}
+    if plugins.get("projects"):
+        at = menu.index("Календарь") + 1
+        menu[at:at] = ["Проекты", "Нагрузка"]
+    expect(links).to_have_text(menu)
     expect(sidebar(auth_page).get_by_role("link", name="Документация")).to_have_attribute(
         "href", "https://help.bord.one/crm/")
     expect(sidebar(auth_page).get_by_role("link", name="Оплата и подписки")).to_have_attribute("href", BILLING)
