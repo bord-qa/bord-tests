@@ -399,7 +399,8 @@ def test_legal_entity_delete(fx_page: Page, entities):
 
 REQS = {"legal_name": "QA Autotest BORD QA SRL", "vat": "1003600099999", "city": "Chișinău",
         "address": "str. QA 42", "phone": "+37360000042", "email": "qa-org@example.com", "web": "https://qa.example.com"}
-REQ_LABEL = {"legal_name": "Юридическое название", "vat": "ИНН / VAT", "city": "Город", "address": "Адрес",
+REQ_LABEL = {"legal_name": "Юридическое название", "vat": "IDNO",  # до 08.11 — «ИНН / VAT»
+             "city": "Город", "address": "Адрес",
              "phone": "Телефон", "email": "Email", "web": "Сайт"}
 
 

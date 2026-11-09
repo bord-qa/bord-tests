@@ -47,11 +47,13 @@ MENU = [
     ("По направлениям", "/admin/reports?report=business_lines"),
     ("Расход без документа", "/admin/reports?report=expenses_no_doc"),
     ("Деньги", "/admin/payments"),
+    ("Касса", "/admin/cash-desk"),  # с 08.11
     ("Платёжный календарь", "/admin/payment-calendar"),
     ("Регулярные", "/admin/recurring"),
     ("Paynet", "/admin/paynet"),
     ("Платёжные шлюзы", "/admin/payment-gateways"),
     ("Бюджеты", "/admin/budgets"),
+    ("Продукты", "/admin/subscriptions"),  # с 08.11
     ("Долги", "/admin/debtors"),
     ("Обязательства", "/admin/obligations"),
     ("Акты сверки", "/admin/reconciliation-acts"),
@@ -91,7 +93,7 @@ MENU = [
 ]
 SCREENS = [(name, href) for name, href in MENU if href.startswith("/admin")]
 # сколько пунктов MENU (по порядку) лежит в каждой группе рельса RAIL_GROUPS
-GROUP_SIZES = [6, 10, 10, 6, 7, 9, 2, 2, 6]
+GROUP_SIZES = [6, 10, 12, 6, 7, 9, 2, 2, 6]
 
 
 def menu_links(page: Page):
@@ -124,7 +126,11 @@ def test_me_is_qa_user_in_bord_qa(fx_page: Page, qa_user):
     me = fx_me(fx_page)
 
     assert me["current_org"]["name"] == qa_user.get("org", "BORD QA"), me["current_org"]
-    assert me["role"] == "owner", me["role"]
+    # с 08.11 верхний role у владельца — «superuser» (права «*» в своей организации);
+    # главное — владелец BORD QA и НЕ администратор платформы
+    assert me["user"]["role"] == "owner", me["user"]["role"]
+    assert [(o["name"], o["role"]) for o in me["orgs"]] == [(me["current_org"]["name"], "owner")], me["orgs"]
+    assert me["platform_role"] is None and me["user"]["platform_role"] is None, me["platform_role"]
     assert me["user"]["bord_linked"] is True
     head = fx_page.locator("header.sticky")
     expect(head.get_by_title(f"Организация: {me['current_org']['name']} · {me['current_org']['plan']}")).to_be_visible()

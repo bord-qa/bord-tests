@@ -442,7 +442,8 @@ def opening_date(fx_page: Page):
     """Дата начальных остатков организации — без неё сальдо не создаётся (422)."""
     org = fx_json(fx_get(fx_page, "/organizations/current"))
     assert org["id"] == QA_ORG
-    if not org["opening_date"]:
+    # с 08.11 форма сальдо берёт дату только отсюда — держим известную на время теста
+    if org["opening_date"] != "2026-01-01":
         fx_json(fx_put(fx_page, f"/organizations/{QA_ORG}", {"opening_date": "2026-01-01"}))
     yield "2026-01-01"
     fx_put(fx_page, f"/organizations/{QA_ORG}", {"opening_date": org["opening_date"]})
@@ -480,7 +481,9 @@ def test_opening_balance_crud(fx_page: Page, opening_date, ob_counterparty):
 
     pick(fx_page, form, "Контрагент", re.compile(re.escape(ob_counterparty["name"])))
     field(form, "Сумма", exact=False).fill("1234.5")
-    field(form, "Дата").fill("2026-01-01")
+    # с 08.11 дата сальдо = дата открытия остатков организации, поле только для чтения
+    expect(field(form, "Дата")).to_have_value("2026-01-01")
+    expect(field(form, "Дата")).not_to_be_editable()
     field(form, "Примечание").fill("сальдо автотеста")
     with fx_page.expect_response(lambda r: r.url.endswith("/api/opening-balances/") and r.request.method == "POST") as resp:
         create.click()

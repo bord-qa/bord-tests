@@ -147,7 +147,7 @@ def test_create_via_form(fx_page: Page, made):
     pick(fx_page, form, "Тип", "Поставщик")
     field(form, "Email").fill("qa-autotest@example.com")
     field(form, "Телефон").fill("+37360000001")
-    field(form, "ИНН").fill(idno)
+    field(form, "IDNO / ИНН").fill(idno)  # до 08.11 — «ИНН»
     field(form, "Адрес").fill("mun. Chișinău, str. QA 1")
     pick(fx_page, form, "Язык документов", "Română")
     field(form, "Заметки").fill("создан автотестом")
