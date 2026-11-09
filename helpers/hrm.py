@@ -28,6 +28,11 @@ QA_PREFIX = "QA Autotest"
 QA_ORG = 42  # организация BORD QA
 ME = 1717  # тест-учётка
 FOREIGN_PEOPLE = {1244, 1748, 1767}  # живой человек и служебные учётки — не трогаем
+# С 08.11 заявке на повышение нужен руководитель (manager_ids, обязательно): ему уходит письмо,
+# уведомление и напоминание раз в 3 дня. Адресуем только тест-учётки: от qaUser — коллеге
+# lemido4693 (qaColleague, 1767), от коллеги — qaUser. Живого Maxim Țurcan (1244) не выбирать.
+RAISE_MANAGER = 1767
+RAISE_MANAGER_NAME = "lemido4693"
 READY_TITLE = re.compile(r".+ — BORD HRM$")
 
 
@@ -180,3 +185,12 @@ def dropdown(page: Page, box, label: str, option: str, starts: bool = False):
                 page.keyboard.press("Escape")
                 raise AssertionError(f"в «{label}» нет варианта «{option}», есть: {options}")
     opt.click()
+
+
+def pick_raise_manager(page: Page, box, name: str = RAISE_MANAGER_NAME):
+    """«Руководитель (можно несколько) *» в заявке на повышение — мультивыбор с поиском."""
+    combo = field(box, "Руководитель", starts=True)
+    combo.click()
+    page.get_by_role("option", name=name, exact=True).click()
+    page.keyboard.press("Escape")
+    expect(combo).to_contain_text(name)

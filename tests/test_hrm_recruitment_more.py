@@ -21,7 +21,7 @@ import datetime as dt
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+from helpers.hrm import (QA_PREFIX, RAISE_MANAGER, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
                          hrm_delete, hrm_get, hrm_json, hrm_post, hrm_put, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -186,7 +186,8 @@ def person(auth_page: Page):
 def test_raise_request_reject(auth_page: Page, person):
     rr = hrm_json(hrm_post(auth_page, "/raise-requests", {"employee_id": person["id"], "current_salary": 10000,
                                                           "desired_salary": 13000, "salary_period": "month",
-                                                          "currency": "MDL", "achievements": "QA"}))
+                                                          "currency": "MDL", "achievements": "QA",
+                                                          "manager_ids": [RAISE_MANAGER]}))
     open_hrm(auth_page, "/admin/raise-requests")
     row = main(auth_page).locator("tr").filter(has_text=person["telegram_first_name"])
     expect(row).to_contain_text("Новая")

@@ -36,7 +36,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
+from helpers.hrm import (QA_PREFIX, RAISE_MANAGER, pick_raise_manager, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
                          dropdown, field, header_button, hrm_delete, hrm_get, hrm_json, hrm_patch, hrm_post, items,
                          open_hrm, screen_title, stamp)
 
@@ -279,6 +279,7 @@ def test_raise_request_flow(auth_page: Page, person):
     header_button(auth_page, "Новая заявка").click()
     box = modal(auth_page, "Заявка на повышение")
     expect(field(box, "Сотрудник")).to_contain_text("Я сам(а)")
+    pick_raise_manager(auth_page, box)
     dropdown(auth_page, box, "Сотрудник", emp["telegram_first_name"])
     field(box, "Текущая ставка / зарплата").fill("18000")
     field(box, "Желаемая ставка / зарплата").fill("21000")
@@ -331,7 +332,8 @@ def test_raise_request_flow(auth_page: Page, person):
 @pytest.mark.writes_data
 def test_raise_request_filter(auth_page: Page, person):
     emp = person["emp"]
-    base = {"employee_id": emp["id"], "salary_period": "month", "currency": "MDL", "achievements": "QA"}
+    base = {"employee_id": emp["id"], "salary_period": "month", "currency": "MDL", "achievements": "QA",
+            "manager_ids": [RAISE_MANAGER]}
     new = hrm_json(hrm_post(auth_page, "/raise-requests", {**base, "current_salary": 100, "desired_salary": 110}))
     rej = hrm_json(hrm_post(auth_page, "/raise-requests", {**base, "current_salary": 200, "desired_salary": 220}))
     hrm_json(hrm_patch(auth_page, f"/raise-requests/{rej['id']}", {"status": "rejected", "decision_comment": "QA нет"}))

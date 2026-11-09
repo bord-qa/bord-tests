@@ -29,6 +29,7 @@ MENU = {
                    ("Проекты", "/admin/projects")],
     "Учет": [("Отсутствия", "/admin/leave"), ("Табель", "/admin/timesheet"), ("ТМЦ", "/admin/tmc"),
              ("Компенсация", "/admin/compensation"), ("Повышение квалификации", "/admin/raise-requests"),
+             ("Поздравления", "/admin/greetings"),  # с 08.11
              ("Дисциплина", "/admin/discipline")],
     "Рекрутинг": [("Рекрутинг", "/admin/recruitment"), ("Источники откликов", "/admin/recruitment/sources"),
                   ("Адаптация", "/admin/onboarding"), ("Навыки", "/admin/skills"), ("Обучение", "/admin/training")],

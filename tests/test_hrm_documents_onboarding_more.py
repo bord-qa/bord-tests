@@ -182,7 +182,7 @@ def test_offboarding_template(auth_page: Page):
         assert resp.value.request.post_data_json["workflow_type"] == "offboarding"
         assert hrm_json(hrm_get(auth_page, f"/onboard/templates/{tpl_id}"))["workflow_type"] == "offboarding"
         expect(main(auth_page).locator("div").filter(has=auth_page.get_by_role("heading", name=name, exact=True)).last
-               ).to_contain_text("Offboarding -- 0 задач")
+               ).to_contain_text("Offboarding · 0 задач")  # до 08.11 — « -- »
     finally:
         hrm_delete(auth_page, f"/onboard/templates/{tpl_id}")
 

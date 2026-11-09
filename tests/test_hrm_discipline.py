@@ -224,7 +224,8 @@ def test_violation_create_and_cancel(auth_page: Page, person, vtype):
     tab(auth_page, "Аудит")
     expect(main(auth_page)).to_contain_text("Журнал изменений")
     expect(main(auth_page)).to_contain_text(f"Нарушение отменено: {reason}")
-    expect(main(auth_page)).to_contain_text(f"Нарушение зафиксировано: {vtype['code']}, серьёзность: серьёзное")
+    # с 08.11 в аудите — название типа, а не его код
+    expect(main(auth_page)).to_contain_text(f"Нарушение зафиксировано: {vtype['name']}, серьёзность: серьёзное")
 
 
 # Кейс: «Редактировать нарушение» → «Сохранить» сохраняет правку

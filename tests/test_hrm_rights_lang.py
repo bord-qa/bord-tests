@@ -15,7 +15,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (HRM, QA_PREFIX, field, hrm_delete, hrm_get, hrm_json, hrm_me, hrm_post, items, open_hrm,
+from helpers.hrm import (HRM, QA_PREFIX, pick_raise_manager, field, hrm_delete, hrm_get, hrm_json, hrm_me, hrm_post, items, open_hrm,
                          screen_title, sidebar, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -58,6 +58,7 @@ def test_colleague_own_raise_request(colleague_page: Page, auth_page: Page):
     box = colleague_page.locator("div.fixed.inset-0:visible").filter(has_text="Заявка на повышение").last
     expect(box.get_by_text("Сотрудник", exact=True)).to_have_count(0)  # выбора сотрудника нет — только за себя
     achievements = f"{QA_PREFIX} коллега закрыл квартал {stamp()}"
+    pick_raise_manager(colleague_page, box, "maxim.turcan1")  # руководитель — тест-учётка qaUser
     field(box, "Текущая ставка / зарплата").fill("10000")
     field(box, "Желаемая ставка / зарплата").fill("11000")
     field(box, "Аргументация", starts=True).fill(achievements)

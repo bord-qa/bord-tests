@@ -296,7 +296,9 @@ def test_rent_plugin(auth_page: Page, person):
             panel.get_by_role("button", name="Заселить", exact=True).last.click()
         assert tn.value.ok and tn.value.json()["occupied"] == 1, tn.value.text()
         expect(panel).to_contain_text("Мест: 3 · занято 1 · свободно 2")
-        expect(panel.locator("tr").filter(has_text=person["telegram_first_name"])).to_contain_text(f"{TODAY:%d.%m.%Y} — сейчас")
+        # с 08.11 ниже жильцов — начисления по месяцам с той же строкой; жилец — в первой таблице
+        tenants = panel.locator("table").first
+        expect(tenants.locator("tr").filter(has_text=person["telegram_first_name"])).to_contain_text(f"{TODAY:%d.%m.%Y} — сейчас")
     finally:
         if rental_id:
             hrm_delete(auth_page, f"/rentals/{rental_id}")

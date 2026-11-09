@@ -121,7 +121,7 @@ def test_onboarding_template_and_process(auth_page: Page, person):
     assert resp.value.request.post_data_json["trigger_event"] == "manual"
     tpl_id = resp.value.json()["id"]
     card = template_card(auth_page, name)
-    expect(card).to_contain_text("Адаптация -- 0 задач")
+    expect(card).to_contain_text("Адаптация · 0 задач")  # до 08.11 — « -- »
     expect(card).to_contain_text("Активен")
 
     card.get_by_role("button", name="Добавить задачу").click()
@@ -134,7 +134,7 @@ def test_onboarding_template_and_process(auth_page: Page, person):
     assert tr.value.ok, tr.value.text()
     body = tr.value.request.post_data_json
     assert (body["title"], body["due_offset_days"], body["is_required"], body["task_type"]) == (task, 3, True, "regular"), body
-    expect(card).to_contain_text("Адаптация -- 1 задач")
+    expect(card).to_contain_text("Адаптация · 1 задач")
     expect(card).to_contain_text(task)
     expect(card).to_contain_text("+3д.")
 
@@ -150,7 +150,7 @@ def test_onboarding_template_and_process(auth_page: Page, person):
     assert run.value.request.post_data_json == {"employee_id": emp["id"], "template_id": tpl_id, "start_date": str(TODAY)}
     [inst] = hrm_json(hrm_get(auth_page, "/onboard/instances", {"employee_id": emp["id"]}))
     item = main(auth_page).get_by_role("button").filter(has_text=emp["telegram_first_name"])
-    expect(item).to_contain_text(f"{name} -- с {TODAY.strftime('%d.%m.%Y')}")
+    expect(item).to_contain_text(f"{name} · с {TODAY.strftime('%d.%m.%Y')}")
     expect(item).to_contain_text("Активен")
     expect(item).to_contain_text("0%")
 
@@ -290,7 +290,7 @@ def test_training_program_enroll(auth_page: Page, person):
     card = program_card(auth_page, title)
     expect(card).to_contain_text("— QA Academy")
     expect(card).to_contain_text(re.compile(r"1\s500 MDL"))
-    expect(card).to_contain_text("0 участников")
+    expect(card).to_contain_text("0 из 20 участников")
 
     card.get_by_role("button", name="Записать сотрудника").click()
     box = modal(auth_page, "Записать сотрудника")
@@ -298,7 +298,7 @@ def test_training_program_enroll(auth_page: Page, person):
     with auth_page.expect_response(lambda r: f"/training/programs/{prog['id']}/enroll" in r.url) as en:
         box.get_by_role("button", name="Записать", exact=True).click()
     assert en.value.ok and en.value.json()["status"] == "enrolled", en.value.text()
-    expect(program_card(auth_page, title)).to_contain_text("1 участников")
+    expect(program_card(auth_page, title)).to_contain_text("1 из 20 участников")  # с 08.11 — «N из макс.»
 
     [rec] = hrm_json(hrm_get(auth_page, "/training/records", {"employee_id": emp["id"]}))
     assert (rec["training_title"], rec["status"], rec["total_cost"], rec["provider"]) == (title, "enrolled", 1500.0, "QA Academy"), rec
