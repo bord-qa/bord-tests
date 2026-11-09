@@ -108,18 +108,23 @@ def grants_of(page: Page, system_id: int, state: str = "all") -> list:
 
 
 def cleanup(page: Page):
-    systems = []
-    for archived in ("false", "true"):
-        resp = api_get(page, f"{API}systems?archived={archived}")
-        systems += resp.json()["items"] if resp.ok else []
+    # Архивные «QA Autotest …» не трогаем: туда попадают только системы, которым
+    # выдавали доступы, а такие API не удаляет никогда (409). Раньше уборка после
+    # КАЖДОГО теста делала по ним DELETE + GET всех доступов — к 08.11 в архиве
+    # накопилось 218 систем, ~440 запросов на тест, и блок упирался в таймаут.
+    resp = api_get(page, f"{API}systems?archived=false")
+    systems = [s for s in (resp.json()["items"] if resp.ok else []) if s["name"].startswith(NAME_PREFIX)]
+    resp = api_get(page, f"{API}grants?state=active")
+    active = resp.json()["items"] if resp.ok else []
     for system in systems:
-        if not system["name"].startswith(NAME_PREFIX):
-            continue
         if api_delete(page, f"{API}systems/{system['id']}").status == 409:
-            for grant in grants_of(page, system["id"], "active"):
+            for grant in [g for g in active if g["system"]["id"] == system["id"]]:
                 api_post(page, f"{API}grants/{grant['id']}/revoke", {"note": "уборка автотеста"})
-            if not system["archived"]:
-                api_patch(page, f"{API}systems/{system['id']}", {"archived": True})
+            api_patch(page, f"{API}systems/{system['id']}", {"archived": True})
+    # тест мог отправить систему в архив раньше, чем отозвал её доступы
+    for grant in active:
+        if grant["system"]["name"].startswith(NAME_PREFIX) and grant["system"]["id"] not in {s["id"] for s in systems}:
+            api_post(page, f"{API}grants/{grant['id']}/revoke", {"note": "уборка автотеста"})
     # «Увольнение: QA Autotest …», «Отозвать доступы: QA Autotest …»
     resp = api_get(page, "/api/tasks/?status=all&limit=100")
     for task in resp.json()["items"] if resp.ok else []:
@@ -187,7 +192,7 @@ def test_counters_match_summary(security: Page):
 
 # Кейс: Встроенная система «BORD» показывает участников организации
 def test_builtin_bord_system_lists_org_members(security: Page):
-    """Встроенная «BORD» = участники организации, «авто», со ссылкой в «Пользователи»."""
+    """Встроенная «BORD» = участники организации, «авто», со ссылкой в «Команду»."""
     users = api_get(security, "/api/admin/auth/users").json()
     bord = [g for g in api_get(security, f"{API}grants?state=active").json()["items"] if g["system"]["name"] == "BORD"]
 
@@ -196,7 +201,8 @@ def test_builtin_bord_system_lists_org_members(security: Page):
         line = rows(security, user["email"])
         expect(line).to_contain_text("BORD")
         expect(line).to_contain_text("авто")
-        expect(line.get_by_role("link", name="в «Пользователях»")).to_have_attribute("href", "/admin/users")
+        # с 08.11 «Пользователи» влились в «Команду»
+        expect(line.get_by_role("link", name="в «Команде»")).to_have_attribute("href", "/admin/team")
 
 
 # Кейс: Добавление системы через форму
@@ -415,13 +421,14 @@ def test_system_with_grants_cannot_be_deleted(security: Page):
     reload(security)
     open_systems(security)
 
-    rows(security, system["name"]).get_by_role("button", name=re.compile("^Удалить")).click()
-    with security.expect_response(lambda r: r.url.endswith(f"systems/{system['id']}") and r.request.method == "DELETE") as deleted:
-        security.get_by_role("dialog", name=f"Удалить «{system['name']}»?").get_by_role("button", name="Да").click()
-
-    assert deleted.value.status == 409
-    expect(security.get_by_text("К системе уже выдавали доступы — её можно только отправить в архив")).to_be_visible()
-    expect(rows(security, system["name"])).to_have_count(1)
+    # с 08.11 фронт не показывает «Удалить» у системы, которой выдавали доступы, — только «В архив»
+    row = rows(security, system["name"])
+    expect(row.get_by_role("button", name="В архив")).to_be_visible()
+    expect(row.get_by_role("button", name=re.compile("^Удалить"))).to_have_count(0)
+    # и сервер такую систему по-прежнему не удаляет
+    deleted = api_delete(security, f"{API}systems/{system['id']}")
+    assert deleted.status == 409, deleted.text()
+    assert "только отправить в архив" in deleted.text()
 
 
 # Кейс: Вкладка реестра открывается
@@ -510,12 +517,18 @@ def test_offboarding_contractor(security: Page):
         card.get_by_role("button", name="Закрыть увольнение").click()
     assert completed.value.ok, completed.value.text()
     expect(main.get_by_text(leaving, exact=True)).to_have_count(0)
-    # сразу после закрытия список перечитывается и клик может потеряться — ждём сам запрос
-    with security.expect_response(lambda r: "offboardings?state=done" in r.url):
-        main.get_by_role("button", name="Закрытые", exact=True).click()
     # у закрытой карточки задачи без заголовка-роли — ищем по имени и пометке
     closed = main.locator("div").filter(has=security.get_by_text(leaving, exact=True)).filter(
         has=security.get_by_text("закрыто", exact=True)).last
+    # сразу после закрытия список перечитывается сам (тот же state=done) и клик
+    # по «Закрытым» может потеряться — жмём, пока карточка не появится
+    for _ in range(4):
+        main.get_by_role("button", name="Закрытые", exact=True).click()
+        try:
+            expect(closed).to_be_visible(timeout=4_000)
+            break
+        except AssertionError:
+            continue
     expect(closed).to_be_visible()
     expect(closed).to_contain_text(f"закрыл {my_name(security)}")
 

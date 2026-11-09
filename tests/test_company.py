@@ -74,6 +74,10 @@ def form(auth_page: Page):
     # заголовок вкладки с 02.11 всегда «BORD» (баг заведён) — готовность ждём по форме
     expect(auth_page.locator("main").get_by_text("Название в BORD")).to_be_visible(timeout=20_000)
     settle(auth_page)
+    # с 08.11 реквизиты (юр. название, НДС, адрес, телефон) свёрнуты под ссылкой —
+    # по умолчанию их подтягивает IDNO из госреестра kyc.bord.one
+    auth_page.locator("main").get_by_text("Исправить реквизиты вручную", exact=True).click()
+    expect(auth_page.locator("main").get_by_placeholder("Exemplu SRL")).to_be_visible()
     before = company(auth_page)
     yield CompanyForm(auth_page)
     if company(auth_page) != before:
@@ -123,6 +127,7 @@ def test_requisites_saved_and_survive_reload(form: CompanyForm):
 
     form.page.reload()
     settle(form.page)
+    form.page.locator("main").get_by_text("Исправить реквизиты вручную", exact=True).click()
     for key, value in values.items():
         expect(getattr(form, key), key).to_have_value(value)
 
@@ -145,8 +150,8 @@ def test_industry_saved(form: CompanyForm):
 
 # Кейс: IDNO должен быть из 13 цифр
 @pytest.mark.writes_data
-@pytest.mark.parametrize("idno", ["123", "100360001234", "10036000123456", "abcdefghijklm"],
-                         ids=["3 цифры", "12 цифр", "14 цифр", "буквы"])
+@pytest.mark.parametrize("idno", ["123", "100360001234", "10036000123456"],
+                         ids=["3 цифры", "12 цифр", "14 цифр"])
 def test_idno_must_be_13_digits(form: CompanyForm, idno):
     before = company(form.page)["idno"]
     form.idno.fill(idno)
@@ -156,6 +161,18 @@ def test_idno_must_be_13_digits(form: CompanyForm, idno):
     assert resp.status == 422, f"IDNO {idno!r} принят: {resp.status}"
     expect(form.page.locator("main").get_by_text("IDNO — 13 цифр")).to_be_visible()
     expect(form.saved).to_have_count(0)
+    assert company(form.page)["idno"] == before
+
+
+# Кейс: Буквы в IDNO — поиск фирмы, сохранить нельзя до выбора из списка
+def test_idno_letters_is_company_search(form: CompanyForm):
+    """С 08.11 в поле IDNO можно вводить название фирмы: это поиск по госреестру,
+    «Сохранить» неактивна, пока фирма не выбрана из списка."""
+    before = company(form.page)["idno"]
+    form.idno.fill("abcdefghijklm")
+
+    expect(form.page.locator("main").get_by_text("Выберите компанию из списка")).to_be_visible()
+    expect(form.save).to_be_disabled()
     assert company(form.page)["idno"] == before
 
 

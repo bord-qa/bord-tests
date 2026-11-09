@@ -60,7 +60,8 @@ def roles_page(auth_page: Page):
 @pytest.fixture
 def editor(roles_page: Page):
     roles_page.locator("main").get_by_role("button", name="Редактор ролей").click()
-    expect(roles_page).to_have_url(re.compile(r"tab=editor"))
+    # с 08.11 роли — вкладка «Команды»: /admin/team?tab=roles&sub=editor
+    expect(roles_page).to_have_url(re.compile(r"(tab|sub)=editor"))
     expect(roles_page.locator("main").get_by_role("button", name="Создать роль")).to_be_visible()
     return roles_page
 

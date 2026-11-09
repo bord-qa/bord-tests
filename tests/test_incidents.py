@@ -245,7 +245,11 @@ def test_close_blocked_until_actions_done(incidents: Page):
     assert closed.value.ok
     saved = incident(incidents, item["id"])
     assert saved["status"] == "closed" and saved["resolved_at"] and saved["closed_at"]
-    timeline = section(incidents, "Хронология", "Добавить")
+    # bord-37 починен: у закрытого инцидента в хронологии больше нет «Добавить» —
+    # блок берём по заголовку и строкам статусов
+    timeline = incidents.locator("main").get_by_text("Хронология", exact=True).locator(
+        "xpath=ancestor::*[contains(normalize-space(), 'Статус:')][1]")
+    expect(timeline.get_by_role("button", name="Добавить", exact=True)).to_have_count(0)
     expect(timeline).to_contain_text("Статус: Открыт → Локализован")
     expect(timeline).to_contain_text("Статус: Локализован → Закрыт")
     incidents.reload()

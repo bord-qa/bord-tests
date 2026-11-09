@@ -4,9 +4,10 @@
 - над мастером — блок «Настроить с ИИ» с адресом https://app.bord.one/mcp;
 - шаги-кнопки «1. Компания» / «2. Команда»;
 - «1. Компания» — те же поля и тот же API, что «Настройки → Компания»
-  (GET /api/onboarding, «Сохранить и дальше» → PUT /api/onboarding/company,
-  уходят все поля формы) → переход на «2. Команда»; «Пропустить и перейти к
-  модулям» → /admin/subscription;
+  (GET /api/onboarding, «Сохранить» → PUT /api/onboarding/company,
+  уходят все поля формы) → переход на «2. Команда», а если она уже «сделано»
+  (с 08.11) — сразу к модулям; реквизиты свёрнуты под «Исправить реквизиты вручную»; «Пропустить и перейти к
+  модулям» → /admin/subscription («Биллинг»);
 - «2. Команда» — строки «email@компания.md» + роль + «Доступ к модулям: N из
   M» + «Убрать»; «Ещё коллега» добавляет строку; «Отправить приглашения» →
   POST /api/admin/auth/invites на каждую строку (note «Приглашение из первой
@@ -71,7 +72,8 @@ def wizard(auth_page: Page):
 
 
 def step(page: Page, name: str):
-    return page.locator("main").get_by_role("button", name=name, exact=True)
+    # с 08.11 у пройденного шага в кнопке иконка «сделано» (входит в имя) — берём по data-testid
+    return page.locator("main").get_by_test_id(f"step-{name.split('.')[0]}")
 
 
 def field(page: Page, label: str):
@@ -84,7 +86,7 @@ def email_rows(page: Page):
 
 def open_team(page: Page):
     step(page, "2. Команда").click()
-    expect(page.locator("main").get_by_text("Пригласите коллег", exact=False)).to_be_visible()
+    expect(page.locator("main").get_by_role("button", name="Отправить приглашения")).to_be_visible()
 
 
 # Кейс: Шаг «Компания» показывает реквизиты из API и ведёт на «Команду»
@@ -93,6 +95,8 @@ def test_company_step_matches_api_and_goes_next(wizard: Page):
     data = company(wizard)
     main = wizard.locator("main")
     expect(main.locator("code", has_text="https://app.bord.one/mcp")).to_be_visible()
+    # с 08.11 реквизиты свёрнуты под ссылкой (по умолчанию их берёт IDNO из госреестра)
+    main.get_by_text("Исправить реквизиты вручную", exact=True).click()
     expect(field(wizard, "Название в BORD *")).to_have_value(data["name"])
     expect(main.get_by_placeholder("Exemplu SRL")).to_have_value(data["legal_name"] or "")
     expect(main.get_by_placeholder("13 цифр")).to_have_value(data["idno"] or "")
@@ -100,13 +104,18 @@ def test_company_step_matches_api_and_goes_next(wizard: Page):
     expect(field(wizard, "Адрес")).to_have_value(data["address"] or "")
     expect(main.get_by_placeholder("+373 …")).to_have_value(data["phone"] or "")
 
+    team_done = step(wizard, "2. Команда").get_by_role("img", name="сделано").count() > 0
     with wizard.expect_response(lambda r: r.url.endswith(SAVE) and r.request.method == "PUT") as saved:
-        main.get_by_role("button", name="Сохранить и дальше").click()
+        main.get_by_role("button", name="Сохранить", exact=True).click()
 
     assert saved.value.ok, saved.value.text()
     assert saved.value.request.post_data_json["name"] == data["name"]
-    expect(main.get_by_text("Пригласите коллег", exact=False)).to_be_visible()
-    expect(main.get_by_role("button", name="Отправить приглашения")).to_be_visible()
+    # с 08.11 мастер перескакивает пройденные шаги: если «Команда» уже «сделано»
+    # (в организации больше одного человека), «Сохранить» ведёт сразу к модулям
+    if team_done:
+        expect(wizard).to_have_url("https://app.bord.one/admin/subscription")
+    else:
+        expect(main.get_by_role("button", name="Отправить приглашения")).to_be_visible()
     # без правок реквизиты не меняются
     assert company(wizard) == data
 
@@ -118,7 +127,7 @@ def test_skip_buttons_lead_to_modules(wizard: Page, button: str):
         open_team(wizard)
     wizard.locator("main").get_by_role("button", name=button).click()
     expect(wizard).to_have_url("https://app.bord.one/admin/subscription")
-    expect(wizard.locator("header").first).to_contain_text("Модули и оплата")
+    expect(wizard.locator("header").first).to_contain_text("Биллинг")
 
 
 # Кейс: «Ещё коллега» добавляет строку, «Убрать» убирает

@@ -13,6 +13,10 @@
 - «Сотрудники» (?tab=people): GET …/module-roles/matrix — человек × модуль,
   у владельца в каждой ячейке «Владелец — всё».
 
+С 08.11.2026 «Пользователи», «Доступы» и «Роли» — вкладки «Команды»
+(/admin/team: «Сотрудники» / «Доступ к модулям» ?tab=access / «Роли»
+?tab=roles&sub=org|editor); старые адреса редиректят туда.
+
 Пишем только роли «QA Autotest …» в модуле «Задачи» и удаляем их в любом исходе.
 """
 import re
@@ -106,8 +110,9 @@ def test_people_matrix_matches_api(access: Page):
     assert resp.ok
     matrix = resp.json()
 
-    access.locator("main").get_by_role("button", name="Сотрудники").click()
-    expect(access).to_have_url(re.compile(r"tab=people"))
+    # с 08.11 «Доступы» — вкладки «Команды»: матрица живёт на «Доступ к модулям»
+    access.locator("main").get_by_role("button", name="Доступ к модулям", exact=True).click()
+    expect(access).to_have_url(re.compile(r"tab=access"))
 
     rows = access.locator("main table tbody tr")
     expect(rows).to_have_count(len(matrix["members"]))
