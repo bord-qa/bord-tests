@@ -11,6 +11,8 @@
   статус («Пробный период»), «N лей / мес», у тарифа за человека
   «(N чел. × M лей)»; кнопки «Оплатить картой», «Сменить тариф» (если тарифов
   больше одного), «Отменить»; ниже «История» (Счета / Оплаты / Баланс);
+  с 10.11 цена за единицу без числа единиц (Маркетинг: units/amount_bani = null)
+  пишется «3 600 лей за рекламный аккаунт»;
 - «Включение модулей» (/admin/modules): карточка на каждый модуль — название,
   описание, «Включён»; выключить можно самому, включает платформенный админ.
 
@@ -34,8 +36,15 @@ def lei(bani: int) -> str:
     return r"\s".join(f"{bani // 100:,}".split(","))
 
 
+def has_price(module: dict) -> bool:
+    """Платный модуль: есть сумма в месяц или цена за единицу (у «Маркетинга» с 10.11
+    единиц нет — amount_bani=null, а на странице «3 600 лей за рекламный аккаунт»)."""
+    price = module["price"]
+    return bool(price and (price["amount_bani"] or (price["per_unit"] and price["unit_bani"])))
+
+
 def priced(data: dict) -> list[dict]:
-    return [m for m in data["modules"] if m["enabled"] and m["price"] and m["price"]["amount_bani"]]
+    return [m for m in data["modules"] if m["enabled"] and has_price(m)]
 
 
 @pytest.fixture
@@ -66,6 +75,11 @@ def test_subscriptions_match_api(billing):
         row = subscription(page, module)
         expect(row, module["key"]).to_have_count(1)
         expect(row).to_contain_text(f"· {price['plan_name']}")
+        if not price["amount_bani"]:
+            # цена за единицу без числа единиц: «3 600 лей за рекламный аккаунт»
+            expect(row).to_contain_text(re.compile(
+                rf"{lei(price['unit_bani'])}\s+лей за {re.escape(price['unit_name'])}"))
+            continue
         expect(row).to_contain_text(re.compile(lei(price["amount_bani"]) + r"\s+лей / мес"))
         if price["per_unit"] and price["units"]:
             # «пользователь» пишется «чел.», остальные единицы — как в API («3 рекламный аккаунт × …»)
@@ -90,7 +104,7 @@ def test_subscription_buttons(billing):
 def test_free_modules_not_in_subscriptions(billing):
     page, data = billing
 
-    for module in (m for m in data["modules"] if m["enabled"] and not (m["price"] and m["price"]["amount_bani"])):
+    for module in (m for m in data["modules"] if m["enabled"] and not has_price(m)):
         expect(subscription(page, module), module["key"]).to_have_count(0)
 
 

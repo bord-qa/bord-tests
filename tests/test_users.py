@@ -62,7 +62,9 @@ def api_users(users_page: Page) -> list:
 def role_labels(users_page: Page) -> dict:
     resp = api_get(users_page, "/api/admin/auth/roles")
     assert resp.ok
-    return resp.json()["labels"]
+    # владельца (superuser) в справочнике ролей нет — его назначить нельзя; с 10.11 он
+    # же и у qaUser в /api/admin/auth/users, на странице — «Владелец»
+    return {"superuser": "Владелец", **resp.json()["labels"]}
 
 
 def staff_rows(page: Page):
