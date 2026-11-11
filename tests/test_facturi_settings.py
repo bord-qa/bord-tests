@@ -41,8 +41,9 @@ pytestmark = pytest.mark.requires_auth
 HUB = {
     "Документы": [("Организация", "/admin/organizations"), ("Юрлица", "/admin/legal-entities"),
                   ("Шаблоны документов", "/admin/settings/templates"), ("Нумерация", "/admin/settings/numbering"),
-                  ("Почта", "/admin/settings/email")],
-    "Интеграции": [("e-Factura", "/admin/settings/efactura"), ("Банковские интеграции", "/admin/bank-integrations")],
+                  ("Почта", "/admin/settings/email"), ("Напоминания об оплате", "/admin/settings/payment-reminders")],
+    "Интеграции": [("e-Factura", "/admin/settings/efactura"), ("Банковские интеграции", "/admin/bank-integrations"),
+                   ("Выгрузка в 1С", "/admin/settings/onec")],
     "Справочники": [("Категории и правила", "/admin/categories"), ("Банковские счета", "/admin/bank-accounts"),
                     ("Валюты", "/admin/currencies"), ("Контрагенты", "/admin/counterparties")],
 }
@@ -61,8 +62,9 @@ def test_settings_hub(fx_page: Page):
     for group, links in HUB.items():
         section = main.locator("div").filter(has=fx_page.get_by_role("heading", name=group, exact=True)).last
         for name, href in links:
-            link = section.get_by_role("link").filter(has_text=name).first
-            expect(link).to_have_attribute("href", href)
+            # по началу текста: в описании «Выгрузки в 1С» (с 10.11) есть слово «Контрагенты»
+            link = section.get_by_role("link").filter(has_text=re.compile("^" + re.escape(name)))
+            expect(link, name).to_have_attribute("href", href)
     main.get_by_role("link").filter(has_text="Почта").first.click()
     expect(fx_page).to_have_url(FACTURI + "/admin/settings/email")
     expect(fx_page).to_have_title("Почта — Facturi")
