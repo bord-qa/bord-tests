@@ -47,6 +47,21 @@ def create_venue(page: Page, **fields) -> dict:
     return resp.json()
 
 
+def pick_venue(page: Page, name: str):
+    """«Цены» открываются на первом заведении организации; если заведений больше одного
+    (ночью в BORD QA их было несколько, 10.11), наше выбирается в переключателе шапки."""
+    names = [v["name"] for v in crm_get(page, "/venues/").json()["items"]]
+    if len(names) < 2:
+        return  # одно заведение — переключателя нет
+    switch = page.locator("header button").filter(
+        has_text=re.compile("|".join(re.escape(n) for n in names))).first
+    expect(switch).to_be_visible(timeout=20_000)
+    if switch.inner_text().strip() != name:
+        switch.click()
+        page.get_by_role("button", name=name, exact=True).click()
+    expect(switch).to_have_text(name)
+
+
 def clean_up(page: Page):
     for v in crm_get(page, "/venues/").json()["items"]:
         if v["name"].startswith(QA_PREFIX):
@@ -287,6 +302,7 @@ def test_program_in_prices(booking: Page):
     assert created.status == 201, created.text()
 
     booking.goto(f"{CRM}/admin/crm/booking/prices")
+    pick_venue(booking, venue["name"])
     main = booking.locator("main")
     expect(main.get_by_text(name)).to_be_visible(timeout=20_000)
     expect(main).to_contain_text("250 MDL за каждого гостя")

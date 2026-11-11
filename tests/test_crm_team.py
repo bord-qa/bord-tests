@@ -221,7 +221,8 @@ def test_roles_tab_matches_api(team: Page):
 
     expect(main).to_contain_text("Права в CRM этой организации решают роли модуля в «Доступах»")
     supers = sum(m["role"] == "superuser" for m in members(team))
-    expect(main).to_contain_text(f"в организации есть {supers} суперпользователя")
+    # число согласуется: «1 суперпользователь», «2 суперпользователя»
+    expect(main).to_contain_text(re.compile(rf"в организации есть {supers} суперпользовател(ь|я|ей)[^а-я]"))
     expect(main.get_by_role("button", name="Показать роли других продуктов")).to_contain_text(f"({hidden})")
     for role in shown:
         card = role_card(team, role["name"]).filter(has_text=str(role["members"]))

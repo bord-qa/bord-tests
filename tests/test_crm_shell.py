@@ -63,9 +63,12 @@ def test_crm_menu(auth_page: Page):
     # плагин «Проекты», если он включён в BORD QA, добавляет «Проекты» и «Нагрузка»
     menu = [re.compile(r"^Входящие\d*$")] + MENU
     plugins = {p["plugin_key"]: p["is_enabled"] for p in crm_get(auth_page, "/plugins/").json()}
+    # с 10.11 так же плагин «Объекты» (включён в BORD QA) — «Объекты» и «Подбор» сразу после «Календаря»
+    at = menu.index("Календарь") + 1
     if plugins.get("projects"):
-        at = menu.index("Календарь") + 1
         menu[at:at] = ["Проекты", "Нагрузка"]
+    if plugins.get("objects"):
+        menu[at:at] = ["Объекты", "Подбор"]
     expect(links).to_have_text(menu)
     expect(sidebar(auth_page).get_by_role("link", name="Документация")).to_have_attribute(
         "href", "https://help.bord.one/crm/")
