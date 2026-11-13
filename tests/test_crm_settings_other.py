@@ -477,11 +477,14 @@ def test_edit_field(settings: Page):
 
 # Кейс: Стрелка «ниже» меняет поля местами — порядок в API тот же
 def test_reorder_fields(settings: Page):
-    first = create_field(settings, sort=0)
-    second = create_field(settings, sort=1)
+    # свои поля — в самый конец списка и подряд: «ниже» меняет поле с соседом снизу,
+    # а в BORD QA есть чужие поля (с 12.11 «Код в 1С», sort=0) — при sort=0/1 оно вставало между нашими
+    last = max((f["sort"] for f in fields(settings)), default=0)
+    first = create_field(settings, sort=last + 1)
+    second = create_field(settings, sort=last + 2)
     open_fields(settings)
     order_before = [f["id"] for f in fields(settings)]
-    assert order_before.index(first["id"]) < order_before.index(second["id"]), order_before
+    assert order_before.index(first["id"]) + 1 == order_before.index(second["id"]), order_before
     with settings.expect_response(api("/custom-fields/reorder", "PUT")) as reordered:
         settings.get_by_role("button", name=f"Переместить поле «{first['name']}» ниже").click()
 

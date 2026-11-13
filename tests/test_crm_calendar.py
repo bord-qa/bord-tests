@@ -27,6 +27,12 @@
 - клик по пустому месту дня → окно дня («В этот день ничего нет» или список)
   с «Добавить на этот день» → то же меню, что у «Создать».
 
+Ячейка месяца показывает не больше 3 записей, остальное — под «+ ещё N» (окно
+дня). В BORD QA бывают дни, занятые чужими записями (12.11: 7 броней из звонков
+на 14.11 — напоминание теста уехало под «+ ещё»), поэтому тесты сетки месяца
+ставят свои записи на ближайший свободный день текущего месяца (free_day), а не
+на «сегодня»; «сегодня» нужно только неделе и дню.
+
 Время событий считаем по часам браузера: в CI у него может быть UTC, дома —
 Кишинёв. Свои записи «QA Autotest …» удаляем, контакты — в архив, как в блоке 21.
 """
@@ -74,6 +80,46 @@ def local_iso(page: Page, day: dt.date, hm: str) -> str:
     minutes = int(page.evaluate("s => -new Date(s).getTimezoneOffset()", f"{day.isoformat()}T{hm}:00"))
     sign = "+" if minutes >= 0 else "-"
     return f"{day.isoformat()}T{hm}:00{sign}{abs(minutes) // 60:02d}:{abs(minutes) % 60:02d}"
+
+
+def busy_days(page: Page, start: dt.date, end: dt.date) -> set[dt.date]:
+    """Дни, на которых в сетке уже что-то стоит: те же три запроса, что у календаря
+    (события, задачи по сроку со статусами по умолчанию, невыполненные напоминания).
+    Даты — по часам браузера, как их раскладывает сетка."""
+    offset = dt.timedelta(minutes=int(page.evaluate("() => -new Date().getTimezoneOffset()")))
+
+    def local(value: str) -> dt.datetime:
+        return as_utc(value) + offset
+
+    days: set[dt.date] = set()
+    rng = {"start": start.isoformat(), "end": end.isoformat(), "limit": 500}
+    for e in crm_get(page, "/calendar/events", rng).json()["items"]:
+        first, last = local(e["start_at"]), local(e["end_at"] or e["start_at"]) - dt.timedelta(minutes=1)
+        d = first.date()
+        while d <= max(first.date(), last.date()):
+            days.add(d)
+            d += dt.timedelta(days=1)
+    statuses = "".join(f"&global_status={x}" for x in DEFAULT_PREFS["task_statuses"])
+    tasks = crm_get(page, f"/tasks/?due_from={start}&due_to={end}&is_archived=false{statuses}&limit=200")
+    days |= {dt.date.fromisoformat(t["due_date"][:10]) for t in tasks.json()["items"] if t.get("due_date")}
+    reminders = crm_get(page, "/reminders/", {"from_dt": start.isoformat(), "to_dt": end.isoformat(), "limit": 200})
+    days |= {local(r["reminder_at"]).date() for r in reminders.json()["items"]}
+    return days
+
+
+def free_day(page: Page, span: int = 1, after: int = 0) -> dt.date:
+    """Первый день текущего месяца (не раньше «сегодня + after»), с которого `span` дней подряд
+    пусты: в ячейке месяца видно лишь 3 записи, лишние прячутся под «+ ещё N».
+    Свободного окна до конца месяца нет — «сегодня + after», как раньше."""
+    start = today(page) + dt.timedelta(days=after)
+    month_end = (start.replace(day=1) + dt.timedelta(days=32)).replace(day=1) - dt.timedelta(days=1)
+    busy = busy_days(page, start, month_end + dt.timedelta(days=1))
+    day = start
+    while day + dt.timedelta(days=span - 1) <= month_end:
+        if not any(day + dt.timedelta(days=i) in busy for i in range(span)):
+            return day
+        day += dt.timedelta(days=1)
+    return start
 
 
 def as_utc(value: str) -> dt.datetime:
@@ -238,7 +284,7 @@ def is_api(path: str, method: str):
 
 # Кейс: Месяц совпадает с API — текущий месяц в шапке, событие, задача и напоминание стоят на своих днях
 def test_month_matches_api(calendar: Page):
-    day = today(calendar)
+    day = free_day(calendar, span=3)
     event = create_event(calendar, day, "12:00")
     task = create_task(calendar, day + dt.timedelta(days=1))
     reminder = create_reminder(calendar, day + dt.timedelta(days=2), "16:00")
@@ -256,7 +302,7 @@ def test_month_matches_api(calendar: Page):
 
 # Кейс: Новое событие через форму — название, описание, место, время; встаёт на свой день
 def test_create_event_via_form(calendar: Page):
-    day = today(calendar) + dt.timedelta(days=1)
+    day = free_day(calendar, after=1)
     name = title()
     form = event_form(calendar)
     form.get_by_placeholder("Встреча с клиентом").fill(name)
@@ -310,7 +356,7 @@ def test_create_event_cancel(calendar: Page):
 
 # Кейс: Правка события — новое название, место и время видны на сетке и в API
 def test_edit_event(calendar: Page):
-    day = today(calendar)
+    day = free_day(calendar)
     event = create_event(calendar, day, "12:00", location="Офис QA")
     reload_calendar(calendar)
     card = open_event(calendar, event)
@@ -336,7 +382,7 @@ def test_edit_event(calendar: Page):
 
 # Кейс: Удаление события — подтверждение «Удалить событие «…»?» → «Продолжить», событие пропадает
 def test_delete_event(calendar: Page):
-    event = create_event(calendar, today(calendar))
+    event = create_event(calendar, free_day(calendar))
     reload_calendar(calendar)
     card = open_event(calendar, event)
     card.get_by_role("button", name="Удалить").click()
@@ -352,7 +398,7 @@ def test_delete_event(calendar: Page):
 
 # Кейс: Отмена удаления события — событие остаётся
 def test_delete_event_cancel(calendar: Page):
-    event = create_event(calendar, today(calendar))
+    event = create_event(calendar, free_day(calendar))
     reload_calendar(calendar)
     card = open_event(calendar, event)
     card.get_by_role("button", name="Удалить").click()
@@ -367,7 +413,7 @@ def test_delete_event_cancel(calendar: Page):
 
 # Кейс: «Добавить на этот день» — форма события открывается с датой выбранного дня
 def test_add_on_day(calendar: Page):
-    day = today(calendar) + dt.timedelta(days=1)
+    day = free_day(calendar, after=1)
     task = create_task(calendar, day)
     reload_calendar(calendar)
     day_number(chip(calendar, task["title"])).click()
@@ -432,7 +478,7 @@ def test_navigation(calendar: Page):
 
 # Кейс: Задача в календаре открывает свою карточку
 def test_task_opens_card(calendar: Page):
-    task = create_task(calendar, today(calendar))
+    task = create_task(calendar, free_day(calendar))
     reload_calendar(calendar)
     chip(calendar, task["title"]).click()
 
@@ -443,7 +489,7 @@ def test_task_opens_card(calendar: Page):
 
 # Кейс: «Статусы задач» — завершённая скрыта по умолчанию, видна после включения «Завершена»
 def test_task_status_filter(calendar: Page):
-    task = create_task(calendar, today(calendar), global_status="done")
+    task = create_task(calendar, free_day(calendar), global_status="done")
     reload_calendar(calendar)
     statuses = calendar.locator("main").get_by_title("Какие задачи показывать по статусу")
     expect(statuses).to_contain_text("4/5")
@@ -459,7 +505,7 @@ def test_task_status_filter(calendar: Page):
 
 # Кейс: «Мои» прячет чужие и неназначенные задачи, «Все» возвращает
 def test_mine_and_all(calendar: Page):
-    task = create_task(calendar, today(calendar), responsible_id=None)
+    task = create_task(calendar, free_day(calendar), responsible_id=None)
     reload_calendar(calendar)
     expect(chip(calendar, task["title"])).to_have_count(1)
 
@@ -475,7 +521,7 @@ def test_mine_and_all(calendar: Page):
 
 # Кейс: Слои «События / Задачи / Напоминания» прячут и возвращают свои записи
 def test_layers(calendar: Page):
-    day = today(calendar)
+    day = free_day(calendar)
     items = {"События": create_event(calendar, day)["title"],
              "Задачи": create_task(calendar, day)["title"],
              "Напоминания": create_reminder(calendar, day)["message"]}
@@ -493,7 +539,7 @@ def test_layers(calendar: Page):
 
 # Кейс: Новое напоминание через форму — по контакту, на свой день и время
 def test_create_reminder_via_form(calendar: Page):
-    day = today(calendar) + dt.timedelta(days=1)
+    day = free_day(calendar, after=1)
     contact = create_contact(calendar)
     text = title()
     create_menu(calendar, "Напоминание")
@@ -516,7 +562,7 @@ def test_create_reminder_via_form(calendar: Page):
 
 # Кейс: «Выполнено» у напоминания — оно уходит с сетки, в API is_completed
 def test_reminder_done(calendar: Page):
-    reminder = create_reminder(calendar, today(calendar), "16:00")
+    reminder = create_reminder(calendar, free_day(calendar), "16:00")
     reload_calendar(calendar)
     chip(calendar, reminder["message"]).click()
     card = overlay(calendar, "Выполнено")
@@ -534,7 +580,7 @@ def test_reminder_done(calendar: Page):
 
 # Кейс: Удаление напоминания — подтверждение «Удалить напоминание?» → «Продолжить»
 def test_reminder_delete(calendar: Page):
-    reminder = create_reminder(calendar, today(calendar), "16:00")
+    reminder = create_reminder(calendar, free_day(calendar), "16:00")
     reload_calendar(calendar)
     chip(calendar, reminder["message"]).click()
     overlay(calendar, "Выполнено").get_by_role("button", name="Удалить").click()

@@ -6,13 +6,13 @@
 - «1. Компания» — те же поля и тот же API, что «Настройки → Компания»
   (GET /api/onboarding, «Сохранить» → PUT /api/onboarding/company,
   уходят все поля формы) → переход на «2. Команда», а если она уже «сделано»
-  (с 08.11) — сразу к модулям; реквизиты свёрнуты под «Исправить реквизиты вручную»; «Пропустить и перейти к
-  модулям» → /admin/subscription («Биллинг»);
+  (с 08.11) — сразу в «Биллинг» (/admin/subscription); реквизиты свёрнуты под «Исправить реквизиты вручную»; «Пропустить и перейти к
+  модулям» → /admin/catalog («Модули», с 12.11; раньше — «Биллинг»);
 - «2. Команда» — строки «email@компания.md» + роль + «Доступ к модулям: N из
   M» + «Убрать»; «Ещё коллега» добавляет строку; «Отправить приглашения» →
   POST /api/admin/auth/invites на каждую строку (note «Приглашение из первой
   настройки»), отправленная строка блокируется с зелёной галочкой;
-  «Дальше — выбрать модули» → /admin/subscription.
+  «Дальше — выбрать модули» → /admin/catalog (каталог подключения модулей).
 
 Настоящие адреса в «Команду» не вводим — придёт письмо. ecom-100214: адрес
 не проверяется ни формой, ни сервером — «not-an-email» становится рабочим
@@ -27,6 +27,10 @@ from playwright.sync_api import Page, expect
 
 from helpers.api import api_delete, api_get, api_put
 from helpers.wait import settle
+
+# с 12.11 «Пропустить и перейти к модулям» и «Дальше — выбрать модули» ведут в каталог
+# «Модули» (новый пункт меню), а не в «Биллинг»
+MODULES_URL = "https://app.bord.one/admin/catalog"
 
 pytestmark = pytest.mark.requires_auth
 
@@ -113,6 +117,7 @@ def test_company_step_matches_api_and_goes_next(wizard: Page):
     # с 08.11 мастер перескакивает пройденные шаги: если «Команда» уже «сделано»
     # (в организации больше одного человека), «Сохранить» ведёт сразу к модулям
     if team_done:
+        # «Сохранить» ведёт в «Биллинг», а «Пропустить» / «Дальше» — в каталог «Модули»
         expect(wizard).to_have_url("https://app.bord.one/admin/subscription")
     else:
         expect(main.get_by_role("button", name="Отправить приглашения")).to_be_visible()
@@ -126,8 +131,8 @@ def test_skip_buttons_lead_to_modules(wizard: Page, button: str):
     if button.startswith("Дальше"):
         open_team(wizard)
     wizard.locator("main").get_by_role("button", name=button).click()
-    expect(wizard).to_have_url("https://app.bord.one/admin/subscription")
-    expect(wizard.locator("header").first).to_contain_text("Биллинг")
+    expect(wizard).to_have_url(MODULES_URL)
+    expect(wizard.locator("header").first).to_contain_text("Модули")
 
 
 # Кейс: «Ещё коллега» добавляет строку, «Убрать» убирает

@@ -4,7 +4,7 @@
 Снято 02.11.2026 (в видимом MCP-браузере):
 - «Дашборд» (/admin) — вкладки дашбордов («Основной» + свои) и «Новый», «Настроить».
   Состав «Основного» = GET /api/dashboards/ (dashboards[].layout: type, w; widgets —
-  палитра из 18 видов). Виджеты читают свои ручки: «С чего начать» —
+  палитра видов, с 12.11 их 20; default_layout — «Основной» по умолчанию). Виджеты читают свои ручки: «С чего начать» —
   /onboarding/checklist («N из M»), «Четыре ответа» — /dashboard/ (money_now,
   receivable_block, payable_block), «Требует внимания» — /inbox/, «Рекомендации» —
   /dashboard/recommendations (клик раскрывает текст, «Что проверить», ссылки),
@@ -71,7 +71,16 @@ def test_dashboard_default_widgets(fx_page: Page):
         open_fx(fx_page, "/admin")
     data = resp.value.json()
     assert data["dashboards"][0]["name"] == "Основной", data["dashboards"]
-    assert len(data["widgets"]) == 18, [w["type"] for w in data["widgets"]]
+    # data["widgets"] — каталог типов (с 12.11 их 20: + income_categories, top_expense), а не дашборд.
+    # «Основной» — dashboards[0].layout: пока он виртуальный (id=null), это default_layout
+    # (на 13.11 — 18 виджетов); «Сохранить» своего дашборда материализует его в запись со
+    # снимком тогдашнего состава (в BORD QA так живёт id=8 из 17 — без dso), новые виджеты
+    # по умолчанию туда уже не попадают
+    board = data["dashboards"][0]
+    types = [w["type"] for w in board["layout"]]
+    assert set(types) <= {w["type"] for w in data["widgets"]}, ", ".join(types)
+    if board["virtual"]:
+        assert types == [w["type"] for w in data["default_layout"]], ", ".join(types)
     expect(main(fx_page).get_by_role("button", name="Основной", exact=True)).to_be_visible()
     expect(main(fx_page).get_by_role("button", name="Новый", exact=True)).to_be_visible()
     for heading in ("С начала месяца", "Как дела у компании", "Динамика остатков", "Поступления и списания",

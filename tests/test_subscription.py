@@ -13,6 +13,9 @@
   больше одного), «Отменить»; ниже «История» (Счета / Оплаты / Баланс);
   с 10.11 цена за единицу без числа единиц (Маркетинг: units/amount_bani = null)
   пишется «3 600 лей за рекламный аккаунт»;
+  с 12.11 «Биллинг» грузит GET /api/subscription/billing (overview, after_trial
+  [{key, name, price}], invoices…), а не /api/subscription — эталоном модулей
+  остаётся /api/subscription (там есть enabled), страница ждёт ответа billing;
 - «Включение модулей» (/admin/modules): карточка на каждый модуль — название,
   описание, «Включён»; выключить можно самому, включает платформенный админ.
 
@@ -29,6 +32,7 @@ from helpers.wait import settle
 pytestmark = pytest.mark.requires_auth
 
 API = "/api/subscription"
+BILLING_API = "/api/subscription/billing"
 
 
 def lei(bani: int) -> str:
@@ -49,12 +53,12 @@ def priced(data: dict) -> list[dict]:
 
 @pytest.fixture
 def billing(auth_page: Page) -> tuple[Page, dict]:
-    with auth_page.expect_response(lambda r: r.url.endswith(API)) as resp:
+    with auth_page.expect_response(lambda r: r.url.endswith(BILLING_API)) as resp:
         auth_page.goto("/admin/subscription")
     assert resp.value.ok, resp.value.status
     expect(auth_page.locator("main").get_by_text("Подписки", exact=True)).to_be_visible(timeout=20_000)
     settle(auth_page)
-    return auth_page, resp.value.json()
+    return auth_page, api_get(auth_page, API).json()
 
 
 def subscription(page: Page, module: dict):

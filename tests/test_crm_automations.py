@@ -14,7 +14,8 @@
   у «Поставить задачу по сделке» — «Название задачи» ({title}, {number}) и
   исполнитель «Ответственный за сделку». «Активно» по умолчанию снято —
   правило сохраняется выключенным;
-- карточка правила: название, триггер, условия («сумма ≥ N · сумма ≤ N»),
+- карточка правила: название, триггер, условия («сумма ≥ N · сумма ≤ M»;
+  с 12.11 при N = M — одно «сумма N»),
   действие и его сводка, переключатель (role=switch, aria-checked),
   «Выполнить сейчас на последнем событии» («Это не проверка: действие
   выполнится по-настоящему» → «Продолжить» → «Правило сработало на событии
@@ -56,6 +57,11 @@ def unique_amount() -> int:
 
 def task_title_template() -> str:
     return f"{QA_PREFIX} звонок по {{title}}"
+
+
+def amount_condition(low: int, high: int) -> str:
+    """Условие суммы в карточке правила: с 12.11 равные границы пишутся одним «сумма N»."""
+    return f"сумма {low}" if low == high else f"сумма ≥ {low} · сумма ≤ {high}"
 
 
 def meta(page: Page) -> dict:
@@ -213,7 +219,7 @@ def test_list_matches_api(automations: Page):
     for rule in (off, on):
         card = rule_card(automations, rule["name"])
         expect(card).to_contain_text("Сделка сменила стадию")
-        expect(card).to_contain_text(f"сумма ≥ {amount} · сумма ≤ {amount}")
+        expect(card).to_contain_text(amount_condition(amount, amount))
         expect(card).to_contain_text("Поставить задачу по сделке")
         expect(card).to_contain_text(f"{task_title_template()} · ответственному сделки")
         expect(card.get_by_role("switch")).to_have_attribute("aria-checked", str(rule["is_active"]).lower())
@@ -291,7 +297,7 @@ def test_create_rule_via_form(automations: Page):
         "create_task", task_title_template(), "deal", False), rule
     expect(form).to_have_count(0)
     card = rule_card(automations, name)
-    expect(card).to_contain_text(f"сумма ≥ {amount} · сумма ≤ {amount}")
+    expect(card).to_contain_text(amount_condition(amount, amount))
     expect(card.get_by_role("switch")).to_have_attribute("aria-checked", "false")
 
 
@@ -445,7 +451,7 @@ def test_edit_rule(automations: Page):
     assert resp.value.ok, resp.value.text()
 
     low, high = min(amount, new_amount), max(amount, new_amount)
-    expect(rule_card(automations, new_name)).to_contain_text(f"сумма ≥ {low} · сумма ≤ {high}")
+    expect(rule_card(automations, new_name)).to_contain_text(amount_condition(low, high))
     expect(rule_card(automations, rule["name"])).to_have_count(0)
     saved = crm_get(automations, f"/auto-actions/{rule['id']}").json()
     assert (saved["name"], saved["trigger_config"], saved["is_active"]) == (

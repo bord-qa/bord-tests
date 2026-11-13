@@ -120,7 +120,9 @@ def test_configure_offers_all_presets(start: Page, org_map):
     current = next(p["name"] for p in org_map["presets"] if p["key"] == org_map["preset"])
 
     start.get_by_role("button", name="Настроить").click()
-    preset = start.locator("main button[aria-haspopup='listbox']").first
+    # с 12.11 над шаблоном блок «Посмотреть как роль» со своими выпадашками ролей
+    # по модулям — выпадашка шаблона берётся по title
+    preset = start.locator("main button[aria-haspopup='listbox'][title='Шаблон вертикали']")
     expect(preset).to_have_text(current)
     preset.click()
 

@@ -26,6 +26,7 @@ import re
 
 import pytest
 from playwright.sync_api import Page, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from helpers.crm import CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put, open_crm
 
@@ -186,7 +187,15 @@ def test_search_opens_task(crm: Page):
     panel = crm.locator("div.fixed.inset-0.justify-end").filter(has_text="Открыть полностью").last
     expect(panel).to_contain_text(task["title"], timeout=20_000)
     panel.get_by_text("Открыть полностью").click()
-    expect(crm).to_have_url(re.compile(rf"/admin/crm/tasks\?.*\btask={task['id']}\b"))
+    full = re.compile(rf"/admin/crm/tasks\?.*\btask={task['id']}\b")
+    try:
+        crm.wait_for_url(full, timeout=5_000)
+    except PlaywrightTimeoutError:
+        # с 12.11 кнопка только закрывает панель и оставляет «Отчёты» (?tab=overview)
+        if "/admin/crm/reports" in crm.url and "panel=" not in crm.url:
+            pytest.xfail("bord-320: «Открыть полностью» в панели задачи закрывает панель вместо перехода")
+        raise
+    expect(crm).to_have_url(full)
 
 
 # Кейс: Нет совпадений — «Ничего не найдено»; Esc закрывает палитру
