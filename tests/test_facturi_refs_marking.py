@@ -97,8 +97,9 @@ def cat_row(page: Page, name: str):
 def test_category_create_via_form(fx_page: Page, categories):
     name = f"{QA_PREFIX} Доход {stamp()}"
     open_categories(fx_page)
-    head(fx_page).get_by_role("button", name="Новая категория", exact=True).click()
-    form = modal(fx_page, "Новая категория")
+    # с 15.11 «Категории» называются «Статьи»
+    head(fx_page).get_by_role("button", name="Новая статья", exact=True).click()
+    form = modal(fx_page, "Новая статья")
     create = form.get_by_role("button", name="Создать", exact=True)
     expect(create).to_be_disabled()
 
@@ -217,8 +218,9 @@ def open_lines(page: Page) -> list[dict]:
 
 
 def new_line_form(page: Page):
-    head(page).get_by_role("button", name="Новая бизнес-линия", exact=True).click()
-    form = modal(page, "Новая бизнес-линия")
+    # с 15.11 «Бизнес-линии» называются «Направления»
+    head(page).get_by_role("button", name="Новое направление", exact=True).click()
+    form = modal(page, "Новое направление")
     expect(form.get_by_role("button", name="Создать", exact=True)).to_be_disabled()
     return form
 

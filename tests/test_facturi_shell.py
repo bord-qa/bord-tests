@@ -36,21 +36,23 @@ MENU = [
     ("Подтвердить накладные", "/admin/efactura-approvals"),
     ("Юнит-экономика", "/admin/unit-economics"),
     ("Документация", "https://help.bord.one/facturi/"),
-    ("Прибыли и убытки", "/admin/reports?report=pnl"),
-    ("Упрощённый P&L", "/admin/reports?report=pnl_simple"),
+    # с 15.11 разделы переименованы: «Прибыли и убытки» → «… — подробно», «Упрощённый P&L» → «… — кратко»,
+    # «По направлениям», «Деньги», «Paynet», «Накладные», «Банк. счета», «Счета учёта», «Категории», «Бизнес-линии»
+    ("Прибыль и убытки — подробно", "/admin/reports?report=pnl"),
+    ("Прибыль и убытки — кратко", "/admin/reports?report=pnl_simple"),
     ("Точка безубыточности", "/admin/reports?report=breakeven"),
     ("Денежный поток", "/admin/reports?report=cashflow"),
     ("План денег", "/admin/reports?report=cash_plan"),
     ("Динамика остатков", "/admin/reports?report=balance_dynamics"),
     ("Распределение", "/admin/reports?report=allocation"),
     ("Налоги", "/admin/reports?report=taxes"),
-    ("По направлениям", "/admin/reports?report=business_lines"),
+    ("Прибыль по направлениям", "/admin/reports?report=business_lines"),
     ("Расход без документа", "/admin/reports?report=expenses_no_doc"),
-    ("Деньги", "/admin/payments"),
+    ("Движение денег", "/admin/payments"),
     ("Касса", "/admin/cash-desk"),  # с 08.11
     ("Платёжный календарь", "/admin/payment-calendar"),
     ("Регулярные", "/admin/recurring"),
-    ("Paynet", "/admin/paynet"),
+    ("Paynet — транзит оплат", "/admin/paynet"),
     ("Платёжные шлюзы", "/admin/payment-gateways"),
     ("Бюджеты", "/admin/budgets"),
     ("Продукты", "/admin/subscriptions"),  # с 08.11
@@ -63,7 +65,7 @@ MENU = [
     ("Офферы", "/admin/estimates"),  # до 04.11 — «Оферты»
     ("Счета на оплату", "/admin/payment-invoices"),
     ("Акты", "/admin/acts"),
-    ("Накладные", "/admin/invoices"),
+    ("Накладные клиентам", "/admin/invoices"),
     ("Каталог услуг", "/admin/catalog"),
     ("Ведомости", "/admin/salary"),
     ("Сотрудники", "/admin/salary/employees"),
@@ -75,10 +77,10 @@ MENU = [
     ("Контрагенты", "/admin/counterparties"),
     ("Организации", "/admin/organizations"),
     ("Юрлица", "/admin/legal-entities"),
-    ("Банк. счета", "/admin/bank-accounts"),
-    ("Счета учёта", "/admin/accounts"),
-    ("Категории", "/admin/categories"),
-    ("Бизнес-линии", "/admin/business-lines"),
+    ("Банковские счета и кассы", "/admin/bank-accounts"),
+    ("План счетов", "/admin/accounts"),
+    ("Статьи", "/admin/categories"),
+    ("Направления", "/admin/business-lines"),
     ("Валюты", "/admin/currencies"),
     ("Сальдо на начало", "/admin/opening-balances"),
     ("Шаблоны документов", "/admin/settings/templates"),
@@ -91,11 +93,12 @@ MENU = [
     ("Проверки", "/admin/selfcheck"),
     ("Общие настройки", "/admin/settings"),
     ("Telegram-бот", "/admin/settings/telegram"),  # с 12.11
+    ("Почта для документов", "/admin/settings/email"),  # с 15.11 и в меню
     ("Профиль", "/admin/profile"),
 ]
 SCREENS = [(name, href) for name, href in MENU if href.startswith("/admin")]
 # сколько пунктов MENU (по порядку) лежит в каждой группе рельса RAIL_GROUPS
-GROUP_SIZES = [6, 10, 12, 7, 7, 9, 2, 2, 7]
+GROUP_SIZES = [6, 10, 12, 7, 7, 9, 2, 2, 8]
 
 
 def menu_links(page: Page):

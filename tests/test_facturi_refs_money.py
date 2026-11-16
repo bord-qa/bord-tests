@@ -103,7 +103,7 @@ def test_bank_accounts_match_api(fx_page: Page, bank_accounts):
         expect(cells.nth(1)).to_have_text(TYPE_LABEL[acc["type"]])
         expect(cells.nth(2)).to_have_text(acc["currency"])
         expect(cells.nth(3)).to_contain_text(acc["currency"])
-    expect(head(fx_page)).to_contain_text(f"Банк. счета{len(api)}")
+    expect(head(fx_page)).to_contain_text(f"Банковские счета и кассы{len(api)}")  # до 15.11 — «Банк. счета»
 
 
 # Кейс: Новый банковский счёт через форму
@@ -206,8 +206,13 @@ def ledger(fx_page: Page):
     ids: list[int] = []
 
     def create(**data) -> dict:
-        body = {"code": account_code(), "name": f"{QA_PREFIX} Счёт учёта {stamp()}", "type": "expense", **data}
-        acc = fx_json(fx_post(fx_page, "/accounts/", body))
+        body = {"name": f"{QA_PREFIX} Счёт учёта {stamp()}", "type": "expense", **data}
+        # выключенные счета держат код, а 6 цифр кода повторяются — на 409 берём другой
+        for _ in range(5):
+            resp = fx_post(fx_page, "/accounts/", {"code": account_code(), **body})
+            if resp.status != 409:
+                break
+        acc = fx_json(resp)
         ids.append(acc["id"])
         return acc
 
@@ -355,7 +360,8 @@ def test_legal_entities_match_api(fx_page: Page, entities):
     entities(legal_name="QA Autotest Список SRL")
     api = open_entities(fx_page)
 
-    expect(fx_page.locator("main tbody tr")).to_have_count(len(api))
+    # с 15.11 под списком вторая таблица «Кто какие фирмы видит» (строка на сотрудника) — считаем только список
+    expect(fx_page.locator("main table").first.locator("tbody tr")).to_have_count(len(api))
     for le in api:
         r = row(fx_page, le["name"])
         expect(r).to_contain_text(le["legal_name"] or "—")

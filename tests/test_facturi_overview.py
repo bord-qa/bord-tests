@@ -136,7 +136,11 @@ def test_dashboard_recommendation_expands(fx_page: Page):
         pytest.skip("рекомендаций сейчас нет — раскрывать нечего")
     rec = items[0]
     card = widget(fx_page, "Рекомендации")
-    head = card.get_by_role("button").filter(has_text=rec["title"])
+    # с 15.11 в шапке заголовок без суммы («Кассовый разрыв через 1 неделю»), сумма — рядом числом
+    title = re.sub(r":\s*[−-]?[\d\s.,]+ MDL$", "", rec["title"])
+    head = card.get_by_role("button").filter(has_text=title)
+    if rec.get("amount_mdl") is not None:
+        expect(head).to_contain_text(money(rec["amount_mdl"]))
     head.click()
     expect(head).to_have_attribute("aria-expanded", "true")
     expect(card).to_contain_text(rec["text"])

@@ -257,7 +257,17 @@ def test_sales_funnel_matches_api(reports: Page):
     main = reports.locator("main")
     expect(main).to_contain_text("Воронка сделок")
 
+    # с 15.11 воронки без сделок за период (ни «сейчас», ни «дошли») прячутся одной строкой
+    by_pipeline: dict[int, list] = {}
     for stage in funnel["deal_stages"]:
+        by_pipeline.setdefault(stage["pipeline_id"], []).append(stage)
+    empty = [pid for pid, st in by_pipeline.items() if not any(s["count"] or s["reached"] for s in st)]
+    if empty:
+        expect(main).to_contain_text(f"Скрыто воронок без сделок за период: {len(empty)}.")
+    else:
+        expect(main).not_to_contain_text("Скрыто воронок без сделок")
+
+    for stage in (s for s in funnel["deal_stages"] if s["pipeline_id"] not in empty):
         conversion = "—" if stage["conversion_from_prev"] is None else f"{stage['conversion_from_prev']:.1f}%"
         expect(main).to_contain_text(loose(
             f"{stage['name']} сейчас {stage['count']} {stage['reached']} {money(stage['amount'])} {conversion}"),

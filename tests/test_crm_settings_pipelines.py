@@ -35,6 +35,7 @@
 """
 import random
 import re
+from collections import Counter
 
 import pytest
 from playwright.sync_api import Page, expect
@@ -170,8 +171,13 @@ def counter(page: Page, n: int):
 def test_pipelines_match_api(settings: Page):
     all_pipelines = pipelines(settings)
     expect(counter(settings, len(all_pipelines))).to_be_visible()
-    for p in all_pipelines:
-        expect(pipeline_card(settings, p["name"])).to_be_visible()
+    # имена не уникальны: у BORD QA две архивные пачки воронок плагина «Объекты» (13.11) —
+    # «Продажа» и «Аренда» по два раза; карточек с именем столько же, сколько воронок в API
+    for name, n in Counter(p["name"] for p in all_pipelines).items():
+        cards = pipeline_card(settings, name)
+        expect(cards, name).to_have_count(n)
+        for i in range(n):
+            expect(cards.nth(i)).to_be_visible()
 
     main = next(p for p in all_pipelines if p["is_main"])
     card = expand(settings, main["name"])

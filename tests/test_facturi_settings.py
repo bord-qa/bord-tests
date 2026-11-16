@@ -38,14 +38,21 @@ from helpers.facturi import (FACTURI, QA_PREFIX, confirm, field, fx_delete, fx_g
 
 pytestmark = pytest.mark.requires_auth
 
+# с 15.11 оглавление перегруппировано: + «Уведомления» и «Правила и система», разделы переименованы
 HUB = {
     "Документы": [("Организация", "/admin/organizations"), ("Юрлица", "/admin/legal-entities"),
                   ("Шаблоны документов", "/admin/settings/templates"), ("Нумерация", "/admin/settings/numbering"),
-                  ("Почта", "/admin/settings/email"), ("Напоминания об оплате", "/admin/settings/payment-reminders")],
-    "Интеграции": [("e-Factura", "/admin/settings/efactura"), ("Банковские интеграции", "/admin/bank-integrations"),
+                  ("Почта для документов", "/admin/settings/email"),
+                  ("Напоминания об оплате", "/admin/settings/payment-reminders")],
+    "Уведомления": [("Telegram-бот", "/admin/settings/telegram")],
+    "Интеграции": [("e-Factura", "/admin/settings/efactura"), ("Банк-интеграции", "/admin/bank-integrations"),
                    ("Выгрузка в 1С", "/admin/settings/onec")],
-    "Справочники": [("Категории и правила", "/admin/categories"), ("Банковские счета", "/admin/bank-accounts"),
-                    ("Валюты", "/admin/currencies"), ("Контрагенты", "/admin/counterparties")],
+    "Правила и система": [("Автоматизации", "/admin/automations"), ("Плагины", "/admin/plugins"),
+                          ("Команда", "/admin/team")],
+    "Справочники": [("Статьи", "/admin/categories"), ("Направления", "/admin/business-lines"),
+                    ("Сальдо на начало", "/admin/opening-balances"),
+                    ("Банковские счета и кассы", "/admin/bank-accounts"), ("Валюты", "/admin/currencies"),
+                    ("Контрагенты", "/admin/counterparties")],
 }
 
 
@@ -65,7 +72,7 @@ def test_settings_hub(fx_page: Page):
             # по началу текста: в описании «Выгрузки в 1С» (с 10.11) есть слово «Контрагенты»
             link = section.get_by_role("link").filter(has_text=re.compile("^" + re.escape(name)))
             expect(link, name).to_have_attribute("href", href)
-    main.get_by_role("link").filter(has_text="Почта").first.click()
+    main.get_by_role("link").filter(has_text="Почта для документов").first.click()
     expect(fx_page).to_have_url(FACTURI + "/admin/settings/email")
     expect(fx_page).to_have_title("Почта — Facturi")
 

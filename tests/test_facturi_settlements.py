@@ -277,7 +277,8 @@ def test_reconciliation_act_page(fx_page: Page, s):
     assert [r["doc_number"] for r in act["rows"]] == [inv["number"]], act["rows"]
     assert act["closing"]["net"] == 1000, act["closing"]
     expect(main).to_contain_text(f"Factura {inv['number']}")
-    expect(main).to_contain_text(re.compile(r"Sold final\s*" + money(1000)))
+    # с 15.11 в строке дата: «Sold final la 15.11.2026 1 000,00»
+    expect(main).to_contain_text(re.compile(r"Sold final(?: la [\d.]+)?\s*" + money(1000)))
     expect(main).to_contain_text(re.compile(re.escape(s.cp["name"]) + r" datorează " + money(1000)))
     expect(main.get_by_role("button", name="Скачать PDF")).to_be_visible()
 

@@ -20,6 +20,11 @@
   «Выполнить сейчас на последнем событии» («Это не проверка: действие
   выполнится по-настоящему» → «Продолжить» → «Правило сработало на событии
   №<id>»), «История запусков» (боковая панель), «Изменить», «Удалить»;
+- с 15.11 правило — группа действий: форма «Создать» / «Сохранить» шлёт
+  POST /auto-actions/group {rule_ids, name, trigger_…, actions: [...]} → 200
+  {items: [правило на каждое действие]}; в карточке две «Изменить» — текстом
+  «правило целиком» (title «Изменить правило целиком: …») и значком у действия.
+  Переключатель по-прежнему PUT /auto-actions/<id>;
 - фильтры «Все / Активные / Выключенные» → is_active в запросе, «Сделки» →
   entity_type=deal.
 
@@ -33,6 +38,7 @@
 "deactivated"}) — тестовые правила остаются; тесты переиспользуют
 выключенные «QA Autotest» правила прошлых прогонов.
 """
+import json
 import random
 import re
 import time
@@ -202,6 +208,17 @@ def fill_stage_trigger(page: Page, form, stage: str, amount: int):
     number_field(page, form, "Сумма ≤").fill(str(amount))
 
 
+def edit_button(page: Page, name: str):
+    """«Изменить» правила целиком — у каждого действия своя «Изменить» (значок, с 15.11)."""
+    return rule_card(page, name).get_by_title(re.compile("^Изменить правило целиком"))
+
+
+def group_save(page: Page):
+    """Сохранение формы правила (создание и правка) — POST /auto-actions/group с 15.11."""
+    return page.expect_response(lambda r: r.url.endswith("/api/crm/auto-actions/group")
+                                and r.request.method == "POST")
+
+
 def rule_put(page: Page, rule: dict):
     return page.expect_response(lambda r: r.url.endswith(f"/api/crm/auto-actions/{rule['id']}")
                                 and r.request.method == "PUT")
@@ -283,11 +300,11 @@ def test_create_rule_via_form(automations: Page):
     pick(automations, "Поставить задачу по сделке")
     form.get_by_placeholder("Связаться с клиентом").fill(task_title_template())
     expect(form.get_by_role("checkbox", name=re.compile("^Активно"))).not_to_be_checked()
-    with automations.expect_response(lambda r: r.url.endswith("/api/crm/auto-actions")
-                                     and r.request.method == "POST") as resp:
+    with group_save(automations) as resp:
         form.get_by_role("button", name="Создать", exact=True).click()
-    assert resp.value.status == 201, resp.value.text()
-    rule = resp.value.json()
+    assert resp.value.ok, resp.value.text()
+    assert json.loads(resp.value.request.post_data)["rule_ids"] == []
+    (rule,) = resp.value.json()["items"]  # одно действие — одно правило
     automations._qa_rules.append(rule["id"])
 
     assert (rule["name"], rule["trigger_event"], rule["trigger_status_id"], rule["trigger_config"],
@@ -437,7 +454,7 @@ def test_edit_rule(automations: Page):
     new_name = f"{QA_PREFIX} {tag()}"
     open_automations(automations)
 
-    rule_card(automations, rule["name"]).get_by_role("button", name="Изменить", exact=True).click()
+    edit_button(automations, rule["name"]).click()
     form = overlay(automations, "Изменить автоматизацию")
     name = form.get_by_placeholder("Напр.: «Бронь оплачена» → сделки")
     expect(name).to_have_value(rule["name"])
@@ -446,9 +463,11 @@ def test_edit_rule(automations: Page):
     name.fill(new_name)
     number_field(automations, form, "Сумма ≥").fill(str(min(amount, new_amount)))
     number_field(automations, form, "Сумма ≤").fill(str(max(amount, new_amount)))
-    with rule_put(automations, rule) as resp:
+    with group_save(automations) as resp:
         form.get_by_role("button", name="Сохранить", exact=True).click()
     assert resp.value.ok, resp.value.text()
+    assert json.loads(resp.value.request.post_data)["rule_ids"] == [rule["id"]]
+    assert [r["id"] for r in resp.value.json()["items"]] == [rule["id"]]  # правка, а не новое правило
 
     low, high = min(amount, new_amount), max(amount, new_amount)
     expect(rule_card(automations, new_name)).to_contain_text(amount_condition(low, high))

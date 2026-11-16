@@ -73,7 +73,8 @@ def contacts(auth_page: Page):
 
 
 def rows(page: Page):
-    return page.locator("main tbody tr")
+    # с 15.11 под последней строкой — подгрузчик прокрутки <tr><td colspan=8>…</td></tr>
+    return page.locator("main tbody tr").filter(has=page.locator("td:not([colspan])"))
 
 
 def row(page: Page, name: str):

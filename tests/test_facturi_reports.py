@@ -36,15 +36,16 @@ YEAR_FROM, YEAR_TO = f"{TODAY.year}-01-01", f"{TODAY.year}-12-31"
 MONTH = TODAY.strftime("%Y-%m")
 
 REPORTS = {
-    "pnl": ("Прибыли и убытки", "/api/reports/pnl?"),
-    "pnl_simple": ("Упрощённый P&L", "/api/reports/pnl/simple"),
+    # заголовки с 15.11 (были «Прибыли и убытки», «Упрощённый P&L», «По направлениям»)
+    "pnl": ("Прибыль и убытки — подробно", "/api/reports/pnl?"),
+    "pnl_simple": ("Прибыль и убытки — кратко", "/api/reports/pnl/simple"),
     "breakeven": ("Точка безубыточности", "/api/reports/breakeven"),
     "cashflow": ("Денежный поток", "/api/reports/cashflow"),
     "cash_plan": ("План денег", "/api/reports/cash-plan"),
     "balance_dynamics": ("Динамика остатков", "/api/reports/balance-dynamics"),
     "allocation": ("Распределение", "/api/reports/cash-allocation"),
     "taxes": ("Налоги", "/api/reports/taxes"),
-    "business_lines": ("По направлениям", "/api/reports/by-business-line"),
+    "business_lines": ("Прибыль по направлениям", "/api/reports/by-business-line"),
     "expenses_no_doc": ("Расход без документа", "/api/reports/expenses-without-document"),
 }
 
