@@ -24,6 +24,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+                         person_name,
                          hrm_delete, hrm_get, hrm_json, hrm_post, hrm_put, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -106,7 +107,7 @@ def test_generate_package_from_card(auth_page: Page, env):
     expect(main(auth_page)).to_contain_text("Документов пока нет")  # пустая вкладка — своя кнопка
     main(auth_page).get_by_role("button", name="Сгенерировать документ", exact=True).click()
     box = dialog(auth_page, "Сгенерировать документ")
-    expect(box).to_contain_text(f"Для: {env['emp']['telegram_first_name']}")
+    expect(box).to_contain_text(f"Для: {person_name(env['emp'])}")  # с 17.11 «Фамилия Имя»
     box.get_by_role("button", name="Пакет по типу", exact=True).click()
     dropdown(auth_page, box, "Тип документа", env["package"]["name"])
     with auth_page.expect_response(lambda r: r.url.endswith("/doc-templates/generate-batch")) as gen:

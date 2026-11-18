@@ -2,7 +2,9 @@
 
 Снято 29.10.2026:
 - «Отчёты»: период — кнопки «Сегодня / Вчера / 7 дней / 30 дней (по
-  умолчанию) / Этот месяц / Прошлый месяц» и поля «Дата начала / конца
+  умолчанию) / Этот месяц / Прошлый месяц / За всё время (с 17.11)»; с 17.11 выбор
+  (preset, даты, воронки) хранится на сервере — /user-prefs/me/report-filters, фикстура
+  ставит 30 дней и возвращает как было и поля «Дата начала / конца
   периода» (даты по часам браузера, в адрес не попадают); вкладки «Обзор,
   Продажи, Команда, Клиенты, Путь по этапам, Товары партнёров, Аналитика
   чатов» — в адресе ?tab=overview|sales|team|clients|flow|partners|chats;
@@ -104,10 +106,25 @@ def make_task_with_time(page: Page, minutes: int) -> tuple[dict, dict, str]:
     return task, resp.json(), note
 
 
+FILTERS = "/user-prefs/me/report-filters"
+DEFAULT_FILTERS = {"preset": "30d", "date_from": None, "date_to": None, "pipeline_ids": []}
+
+
+def reset_filters(page: Page):
+    """С 17.11 период и воронки отчётов хранятся на сервере у пользователя (GET/PUT
+    /user-prefs/me/report-filters) и сохраняются при каждом изменении на экране: без
+    сброса тест открывает отчёты за период, оставленный предыдущим тестом (или человеком)."""
+    resp = crm_put(page, FILTERS, DEFAULT_FILTERS)
+    assert resp.ok, f"{FILTERS} → {resp.status}: {resp.text()[:200]}"
+
+
 @pytest.fixture
 def reports(auth_page: Page):
     auth_page._qa_deals, auth_page._qa_tasks = [], []
+    saved = crm_get(auth_page, FILTERS).json().get("filters") or DEFAULT_FILTERS
+    reset_filters(auth_page)
     yield auth_page
+    crm_put(auth_page, FILTERS, saved)
     for deal_id in auth_page._qa_deals:
         crm_delete(auth_page, f"/deals/{deal_id}")
     for task_id in auth_page._qa_tasks:
@@ -116,9 +133,17 @@ def reports(auth_page: Page):
 
 
 def open_reports(page: Page, tab: str = "overview"):
-    open_crm(page, f"{PAGE}?tab={tab}")
+    # С 17.11 экран сначала рисует 30 дней, а потом подтягивает сохранённый период
+    # (GET /user-prefs/me/report-filters, ~0.3 с после кнопок) и ставит его поверх —
+    # клик по периоду раньше этого ответа затирается. Ждём ответ до первых действий.
+    with page.expect_response(lambda r: r.url.endswith("/api/crm" + FILTERS) and r.request.method == "GET"):
+        open_crm(page, f"{PAGE}?tab={tab}")
     # у «Аналитики чатов» свой период — общих полей дат там нет
     expect(tab_button(page, "Аналитика чатов")).to_be_visible()
+    if tab != "chats":  # фикстура поставила 30 дней — дождаться, что экран их применил
+        today = browser_today(page)
+        expect(page.get_by_role("textbox", name="Дата начала периода")).to_have_value(
+            (today - dt.timedelta(days=29)).isoformat())
 
 
 def tab_button(page: Page, name: str):

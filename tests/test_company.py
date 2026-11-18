@@ -35,6 +35,9 @@ INDUSTRIES = {
     "constructii": "Строительство",
     "it": "IT и услуги",
     "productie": "Производство",
+    "horeca": "Бани, рестораны, гостиницы",  # +3 с 17.11
+    "realty": "Недвижимость",
+    "lombard": "Ломбарды",
     "other": "Другая отрасль",
 }
 
@@ -46,8 +49,8 @@ class CompanyForm:
         field = lambda label: main.get_by_text(label, exact=True).locator("xpath=following-sibling::input")
         self.name = field("Название в BORD *")
         # с 02.11 в форме вторая выпадашка — «Страна»; отрасль берём по подписи
-        self.industry = main.get_by_text("Отрасль", exact=True).locator(
-            "xpath=following::button[@aria-haspopup='listbox'][1]")
+        # (с 17.11 подпись «Направление бизнеса», label[for=ob-industry])
+        self.industry = main.locator("label[for='ob-industry'] + button[aria-haspopup='listbox']")
         self.legal_name = main.get_by_placeholder("Exemplu SRL")
         self.idno = main.get_by_placeholder("13 цифр")
         self.vat_code = field("Код НДС")

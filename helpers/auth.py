@@ -13,7 +13,7 @@ import json
 import os
 from pathlib import Path
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import BrowserContext, Page, expect
 
 from helpers.wait import settle
 
@@ -38,6 +38,19 @@ def load_user(key: str = "qaUser") -> dict | None:
     if USERS_FILE.exists():
         return json.loads(USERS_FILE.read_text(encoding="utf-8")).get(key)
     return None
+
+
+def classic_view(ctx: BrowserContext):
+    """Классический вид BORD (боковое меню, каждая система на своём домене).
+
+    С 17.11.2026 по умолчанию включён вид «BORD One» (кука bord_view=one на .bord.one):
+    app.bord.one/admin/one/<система>/… — общая верхняя панель, а CRM, HRM и др. открываются
+    внутри неё в iframe; заход на crm.bord.one/admin/… сразу переадресует в оболочку.
+    Классический вид остался (bord_view=classic, переключатель вида у пользователя) —
+    суита гоняет его; оболочку «BORD One» проверяет отдельный блок.
+    """
+    ctx.add_cookies([{"name": "bord_view", "value": "classic", "domain": ".bord.one", "path": "/",
+                      "secure": True, "sameSite": "Lax"}])
 
 
 class LoginForm:

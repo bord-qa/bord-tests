@@ -356,7 +356,9 @@ def test_payment_flow(projects: Page):
     main.get_by_role("button", name="Этап оплаты").click()
     main.get_by_placeholder("Аванс 30 %").fill("QA аванс")
     main.get_by_placeholder("15000.00").fill("1000")
-    main.locator("input[type=date]").fill("2026-11-15")
+    # срок — в будущем: этап с прошедшим сроком показывается просроченным, а не «Не оплачен»
+    # (до 18.11 тут была зашита дата 2026-11-15)
+    main.locator("input[type=date]").fill((dt.date.today() + dt.timedelta(days=30)).isoformat())
     with projects.expect_response(lambda r: f"/projects/{project['id']}/payments" in r.url
                                   and r.request.method == "POST") as resp:
         main.get_by_role("button", name="Добавить", exact=True).click()

@@ -196,8 +196,9 @@ def test_builtin_bord_system_lists_org_members(security: Page):
     users = api_get(security, "/api/admin/auth/users").json()
     bord = [g for g in api_get(security, f"{API}grants?state=active").json()["items"] if g["system"]["name"] == "BORD"]
 
-    assert sorted(g["login"] for g in bord) == sorted(u["email"] for u in users)
-    for user in users:
+    # сотрудник HRM без почты — тоже участник организации (email = None): сортируем через str
+    assert sorted((g["login"] for g in bord), key=str) == sorted((u["email"] for u in users), key=str)
+    for user in (u for u in users if u["email"]):
         line = rows(security, user["email"])
         expect(line).to_contain_text("BORD")
         expect(line).to_contain_text("авто")

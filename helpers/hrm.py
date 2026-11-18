@@ -34,6 +34,10 @@ FOREIGN_PEOPLE = {1244, 1748, 1767}  # живой человек и служеб
 RAISE_MANAGER = 1767
 RAISE_MANAGER_NAME = "lemido4693"
 READY_TITLE = re.compile(r".+ — BORD HRM$")
+# С 17.11 у компании «Порядок ФИО» (Настройки компании; /api/onboarding → company.name_order,
+# name_order_effective). У BORD QA — «По стране», для Молдовы это «Фамилия Имя»: HRM пишет
+# «Țurcan Maxim», «Тестов QA Autotest …». Меняется организацией — тесты её не трогают.
+NAME_ORDER = "last_first"
 
 
 def _sso(page: Page) -> dict:
@@ -85,6 +89,13 @@ def hrm_delete(page: Page, path: str, params: dict | None = None) -> APIResponse
 def hrm_json(resp: APIResponse):
     assert resp.ok, f"{resp.url} → {resp.status}: {resp.text()[:300]}"
     return resp.json()
+
+
+def person_name(emp: dict) -> str:
+    """Имя сотрудника так, как его пишет экран HRM (с учётом порядка ФИО организации)."""
+    first = emp.get("telegram_first_name") or emp.get("name")
+    parts = [emp.get("last_name"), first] if NAME_ORDER == "last_first" else [first, emp.get("last_name")]
+    return " ".join(filter(None, parts))
 
 
 def items(data):

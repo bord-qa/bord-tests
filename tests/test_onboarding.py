@@ -20,6 +20,7 @@
 заводит аккаунт, «not-an-email» становится и участником BORD QA. Тест на это —
 xfail; уборка отзывает приглашение и удаляет такого участника. Реквизиты общие на организацию — фикстура возвращает их.
 """
+import re
 import time
 
 import pytest
@@ -28,9 +29,9 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_delete, api_get, api_put
 from helpers.wait import settle
 
-# с 12.11 «Пропустить и перейти к модулям» и «Дальше — выбрать модули» ведут в каталог
-# «Модули» (новый пункт меню), а не в «Биллинг»
-MODULES_URL = "https://app.bord.one/admin/catalog"
+# с 12.11 «Пропустить и перейти к модулям» и «Дальше — выбрать модули» вели в каталог «Модули»;
+# с 17.11 обе («Дальше — к работе») ведут в тур нового вида BORD One
+MODULES_URL = "https://app.bord.one/admin/one?tour=1"  # до 17.11 — /admin/catalog
 
 pytestmark = pytest.mark.requires_auth
 
@@ -117,22 +118,25 @@ def test_company_step_matches_api_and_goes_next(wizard: Page):
     # с 08.11 мастер перескакивает пройденные шаги: если «Команда» уже «сделано»
     # (в организации больше одного человека), «Сохранить» ведёт сразу к модулям
     if team_done:
-        # «Сохранить» ведёт в «Биллинг», а «Пропустить» / «Дальше» — в каталог «Модули»
-        expect(wizard).to_have_url("https://app.bord.one/admin/subscription")
+        # «Сохранить» ведёт в «Биллинг» (с 17.11 — /admin/billing, раньше /admin/subscription)
+        expect(wizard).to_have_url(re.compile(r"^https://app\.bord\.one/admin/(billing|subscription)$"))
     else:
         expect(main.get_by_role("button", name="Отправить приглашения")).to_be_visible()
     # без правок реквизиты не меняются
     assert company(wizard) == data
 
 
-# Кейс: «Пропустить» и «Дальше» ведут к модулям
-@pytest.mark.parametrize("button", ["Пропустить и перейти к модулям", "Дальше — выбрать модули"])
+# Кейс: «Пропустить» и «Дальше» ведут в тур BORD One
+@pytest.mark.parametrize("button", ["Пропустить и перейти к модулям", "Дальше — к работе"])
 def test_skip_buttons_lead_to_modules(wizard: Page, button: str):
+    """С 17.11 мастер заканчивается не каталогом «Модули», а туром по новому виду:
+    /admin/one?tour=1 с окном «BORD настроен для вас» (вид переключается на bord_view=one).
+    «Дальше — выбрать модули» стала «Дальше — к работе»; у «Пропустить и перейти к модулям» надпись прежняя."""
     if button.startswith("Дальше"):
         open_team(wizard)
     wizard.locator("main").get_by_role("button", name=button).click()
     expect(wizard).to_have_url(MODULES_URL)
-    expect(wizard.locator("header").first).to_contain_text("Модули")
+    expect(wizard.get_by_text("BORD настроен для вас")).to_be_visible(timeout=15_000)
 
 
 # Кейс: «Ещё коллега» добавляет строку, «Убрать» убирает

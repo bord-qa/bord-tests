@@ -32,7 +32,7 @@ from playwright.sync_api import Page, expect
 
 from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
                          dropdown, field, header_button, hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm,
-                         screen_title, stamp)
+                         person_name, screen_title, stamp)
 
 pytestmark = pytest.mark.requires_auth
 
@@ -46,7 +46,7 @@ def main(page: Page):
 
 
 def full_name(emp: dict) -> str:
-    return " ".join(filter(None, [emp.get("telegram_first_name"), emp.get("last_name")]))
+    return person_name(emp)  # с 17.11 «Фамилия Имя» (порядок ФИО организации)
 
 
 def list_row(page: Page, name: str):
@@ -142,7 +142,7 @@ def test_create_via_form(auth_page: Page, le):
             (first, "Формов", le["id"], "2009001234568"), emp
         assert not emp.get("email"), emp  # без email — без приглашения
         assert emp["hire_date"] == str(TODAY), emp
-        expect(list_row(auth_page, f"{first} Формов")).to_be_visible()
+        expect(list_row(auth_page, person_name({"telegram_first_name": first, "last_name": "Формов"}))).to_be_visible()
     finally:
         delete_employee(auth_page, emp["id"])
 
@@ -171,7 +171,7 @@ def test_edit(auth_page: Page, person):
         form.get_by_role("button", name="Сохранить", exact=True).click()
     assert resp.value.ok, resp.value.text()
     assert hrm_json(hrm_get(auth_page, f"/employees/{person['id']}"))["last_name"] == "Изменённый"
-    expect(card(auth_page)).to_contain_text(f"{person['telegram_first_name']} Изменённый")
+    expect(card(auth_page)).to_contain_text(person_name({**person, "last_name": "Изменённый"}))
 
 
 # Кейс: Уволить и вернуть в работу

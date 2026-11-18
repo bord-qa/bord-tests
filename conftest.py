@@ -1,6 +1,6 @@
 import pytest
 
-from helpers.auth import load_user, login
+from helpers.auth import classic_view, load_user, login
 
 
 @pytest.fixture(scope="session")
@@ -12,6 +12,13 @@ def browser_context_args(browser_context_args):
         # CRM показывает время в зашитом Europe/Chisinau, раннер CI живёт в UTC — без этого время и дни на экране расходятся с тестом
         "timezone_id": "Europe/Chisinau",
     }
+
+
+@pytest.fixture
+def context(context):
+    """Стандартная страница pytest-playwright (экран входа и т.п.) — тоже в классическом виде."""
+    classic_view(context)
+    return context
 
 
 @pytest.fixture(scope="session")
@@ -26,6 +33,7 @@ def qa_user() -> dict:
 def auth_state(browser, base_url, qa_user, tmp_path_factory, browser_context_args):
     """Вход один раз на прогон: сохранённая сессия (localStorage + кука bord_sso)."""
     ctx = browser.new_context(**browser_context_args)
+    classic_view(ctx)
     page = ctx.new_page()
     login(page, qa_user)
     path = tmp_path_factory.mktemp("auth") / "state.json"
@@ -55,6 +63,7 @@ def colleague_user() -> dict:
 @pytest.fixture(scope="session")
 def colleague_state(browser, colleague_user, tmp_path_factory, browser_context_args):
     ctx = browser.new_context(**browser_context_args)
+    classic_view(ctx)
     page = ctx.new_page()
     login(page, colleague_user)
     path = tmp_path_factory.mktemp("auth-colleague") / "state.json"

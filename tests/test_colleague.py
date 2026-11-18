@@ -54,7 +54,8 @@ def cleanup(page: Page, colleague_email: str):
     if colleague and colleague["role"] != EMPLOYEE:
         api_put(page, f"{USERS}/{colleague['id']}/role", {"role": EMPLOYEE})
     for user in members(page):
-        if user["email"].startswith(THROWAWAY):
+        # у сотрудников HRM без почты email = None — они тоже участники организации
+        if (user["email"] or "").startswith(THROWAWAY):
             api_delete(page, f"{USERS}/{user['id']}")
     for invite in api_get(page, INVITES).json():
         if (invite.get("note") or "").startswith(NAME_PREFIX) or (invite.get("email") or "").startswith(THROWAWAY):

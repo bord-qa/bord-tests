@@ -130,6 +130,10 @@ def test_company_create_shows_card_and_row(cp: Page):
         expect(requisite(card, label), label).to_have_text(value)
     expect(card).to_contain_text(f"№ {card_data['id']}")
 
+    # список постраничный (по 50, по имени): в BORD QA контрагентов больше 50, и
+    # «QA Autotest …» оказывается не на первой странице — строку ищем поиском
+    close_modal(cp, name)
+    find(cp, stamp)
     row = rows(cp).filter(has_text=name)
     expect(row).to_have_count(1)
     expect(row).to_contain_text(stamp)

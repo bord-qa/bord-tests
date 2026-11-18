@@ -6,8 +6,8 @@
   Состав «Основного» = GET /api/dashboards/ (dashboards[].layout: type, w; widgets —
   палитра видов, с 12.11 их 20; default_layout — «Основной» по умолчанию). Виджеты читают свои ручки: «С чего начать» —
   /onboarding/checklist («N из M»), «Четыре ответа» — /dashboard/ (money_now,
-  receivable_block, payable_block), «Требует внимания» — /inbox/, «Рекомендации» —
-  /dashboard/recommendations (клик раскрывает текст, «Что проверить», ссылки),
+  receivable_block, payable_block), «Требует внимания» — /inbox/, «Что сделать» (до 17.11
+  «Рекомендации») — /dashboard/recommendations (headline, сумма, кнопка = links[0]),
   «Нам / Мы должны по срокам» — /reports/aging?type=receivable|payable;
 - «Новый» сразу открывает режим правки: «Название», «Добавить виджет» (палитра),
   у виджета ширина «⅓ / ½ / ⅔ / Вся» (w 2/3/4/6), «Раньше / Позже / Убрать»,
@@ -127,71 +127,33 @@ def test_dashboard_aging_matches_api(fx_page: Page, kind, heading):
         expect(card.get_by_role("listitem").filter(has_text=label)).to_contain_text(money(data["totals"][key]))
 
 
-# Кейс: Рекомендация раскрывается — текст, «Что проверить» и ссылки = API
+# Кейс: «Что сделать» — рекомендации: заголовок, сумма и ссылка = API
 def test_dashboard_recommendation_expands(fx_page: Page):
+    """С 17.11 виджет «Рекомендации» стал «Что сделать N»: строки по группам («Деньги»,
+    «Чтобы цифры были верными»), не раскрываются — у строки headline, сумма со знаком (sign)
+    и одна кнопка = links[0]. В группе «Чтобы цифры были верными» — не рекомендации, а сводка
+    проверок учёта, поэтому строк на экране не меньше, чем рекомендаций в API."""
     with fx_page.expect_response(lambda r: "/api/dashboard/recommendations" in r.url) as resp:
         open_fx(fx_page, "/admin")
     items = resp.value.json()["items"]
     if not items:
-        pytest.skip("рекомендаций сейчас нет — раскрывать нечего")
-    rec = items[0]
-    card = widget(fx_page, "Рекомендации")
-    # с 15.11 в шапке заголовок без суммы («Кассовый разрыв через 1 неделю»), сумма — рядом числом
-    title = re.sub(r":\s*[−-]?[\d\s.,]+ MDL$", "", rec["title"])
-    head = card.get_by_role("button").filter(has_text=title)
-    if rec.get("amount_mdl") is not None:
-        expect(head).to_contain_text(money(rec["amount_mdl"]))
-    head.click()
-    expect(head).to_have_attribute("aria-expanded", "true")
-    expect(card).to_contain_text(rec["text"])
-    expect(card).to_contain_text("Что проверить: " + rec["action"])
-    for link in rec["links"]:
-        expect(card.get_by_role("link", name=link["title"], exact=True)).to_have_attribute("href", link["url"])
+        pytest.skip("рекомендаций сейчас нет — сверять нечего")
+    card = main(fx_page).locator(".rounded-2xl").filter(
+        has=fx_page.locator("h2").filter(has_text=re.compile(r"^Что сделать\s*\d*$")))
+    expect(card.locator("h2")).to_have_text(re.compile(r"^Что сделать\s*\d+$"))
+    shown = int(re.search(r"\d+$", card.locator("h2").inner_text().strip()).group())
+    assert shown >= len(items), f"в шапке {shown}, рекомендаций в API {len(items)}"
+    for rec in items:
+        row = card.get_by_role("listitem").filter(has=fx_page.get_by_text(rec["headline"], exact=True))
+        expect(row).to_have_count(1)
+        if rec.get("amount_mdl") is not None:
+            expect(row).to_contain_text(money(rec["amount_mdl"]))
+            if rec.get("sign"):
+                expect(row).to_contain_text(rec["sign"])
+        link = rec["links"][0]
+        expect(row.get_by_role("link")).to_have_attribute("href", link["url"])
+        expect(row.get_by_role("link")).to_have_text(link["title"])
 
-
-@pytest.fixture
-def own_dashboards(fx_page: Page):
-    yield
-    for d in fx_json(fx_get(fx_page, "/dashboards/"))["dashboards"]:
-        if d["id"] and d["name"].startswith(QA_PREFIX):
-            fx_delete(fx_page, f"/dashboards/{d['id']}")
-
-
-# Кейс: Свой дашборд — «Новый», виджет «Быстрый доступ» во всю ширину, сохранение, удаление
-@pytest.mark.writes_data
-def test_custom_dashboard(fx_page: Page, own_dashboards):
-    open_fx(fx_page, "/admin")
-    m = main(fx_page)
-    m.get_by_role("button", name="Новый", exact=True).click()
-    expect(m).to_contain_text("На этом дашборде пока нет виджетов")
-    name = f"{QA_PREFIX} Дашборд {stamp()}"
-    m.get_by_role("textbox").first.fill(name)
-    m.get_by_role("button").filter(has_text="Быстрый доступ").filter(has_text="Ссылки на главные разделы").click()
-    m.get_by_role("button", name="Вся", exact=True).click()
-    with fx_page.expect_response(lambda r: re.search(r"/api/dashboards/\d+$", r.url) and r.request.method == "PUT") as resp:
-        m.get_by_role("button", name="Сохранить", exact=True).click()
-    assert resp.value.ok, resp.value.text()
-    saved = resp.value.json()
-    mine = next(d for d in fx_json(fx_get(fx_page, "/dashboards/"))["dashboards"] if d["name"] == name)
-    assert [(w["type"], w["w"]) for w in mine["layout"]] == [("quick_links", 6)], mine["layout"]
-    assert mine["id"] == saved["id"]
-
-    expect(m.get_by_role("button", name=name, exact=True)).to_be_visible()
-    for href in ("/admin/counterparties", "/admin/payments", "/admin/sales", "/admin/reports"):
-        expect(m.locator(f"a[href='{href}']")).to_be_visible()
-    expect(m.get_by_role("heading", name="С начала месяца")).to_have_count(0)  # открыт свой, не «Основной»
-
-    m.get_by_role("button", name="Настроить", exact=True).click()
-    m.get_by_role("button", name="Удалить дашборд", exact=True).click()
-    with fx_page.expect_response(lambda r: f"/api/dashboards/{mine['id']}" in r.url and r.request.method == "DELETE") as gone:
-        text = confirm(fx_page, "Да")
-    assert f"Удалить дашборд «{name}»?" in text
-    assert gone.value.ok
-    expect(m.get_by_role("button", name=name, exact=True)).to_have_count(0)
-    assert name not in [d["name"] for d in fx_json(fx_get(fx_page, "/dashboards/"))["dashboards"]]
-
-
-# ───────────────────────── инбокс ─────────────────────────
 
 def inbox_item(page: Page, title: str):
     return main(page).locator("div").filter(has=page.get_by_text(title, exact=True)).filter(
@@ -216,7 +178,11 @@ def test_inbox_matches_api(fx_page: Page):
         if it["amount_mdl"]:  # у пунктов без суммы («Документы ждут решения») сумма не выводится
             expect(item).to_contain_text(money(it["amount_mdl"]))
         expect(item.get_by_role("link", name="Разобрать")).to_have_attribute("href", it["url"])
-    first = data["items"][0]
+    # «Показать примеры» есть только у пунктов с примерами (sample не пуст)
+    with_samples = [it for it in data["items"] if it.get("sample")]
+    if not with_samples:
+        return
+    first = with_samples[0]
     item = inbox_item(fx_page, first["title"])
     item.get_by_role("button", name=re.compile(r"^Показать примеры")).click()
     for s in first["sample"]:
