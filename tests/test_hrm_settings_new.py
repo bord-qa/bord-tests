@@ -23,7 +23,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_legal_entity, header_button, hrm_delete, hrm_get, hrm_json,
+from helpers.hrm import (screen_action, QA_PREFIX, clean_up, create_legal_entity, header_button, hrm_delete, hrm_get, hrm_json,
                          hrm_post, hrm_put, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -81,7 +81,8 @@ def test_required_fields(auth_page: Page, required_back):
     form = auth_page.locator("div.fixed.inset-0:visible").filter(
         has=auth_page.get_by_text("Добавить сотрудника", exact=True)).last
     expect(form.get_by_text("Фамилия *", exact=True)).to_be_visible()
-    expect(form.get_by_text("Отчество", exact=True)).to_be_visible()  # необязательное — без звёздочки
+    # необязательное — без звёздочки («Отчество» с ~20.11 в форме не показывается, хотя в «Обязательных полях» есть)
+    expect(form.get_by_text("Личный email", exact=True)).to_be_visible()
     auth_page.keyboard.press("Escape")
 
     le = create_legal_entity(auth_page)
@@ -136,7 +137,7 @@ def test_telegram_bot_bind_code(auth_page: Page):
         expect(main(auth_page).get_by_text("Чаты ещё не подключены")).to_be_visible()
 
     with auth_page.expect_response(lambda r: "/telegram-bot/bind-code" in r.url) as resp:
-        main(auth_page).get_by_role("button", name="Подключить чат").click()
+        screen_action(auth_page, "Подключить чат").click()
     assert resp.value.ok, resp.value.text()[:200]
     code = resp.value.json()
     assert code["code"] and code["expires_in"] == 900, code

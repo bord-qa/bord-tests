@@ -28,7 +28,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
                          hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -101,7 +101,7 @@ def test_numbering_journal_form(auth_page: Page, env):
     name = f"{QA_PREFIX} Журнал {stamp()}"
     open_hrm(auth_page, "/admin/doc-templates")
     tab(auth_page, "Журналы нумерации")
-    main(auth_page).get_by_role("button", name="Добавить журнал").click()
+    screen_action(auth_page, "Добавить журнал").click()
     box = modal(auth_page, "Новый журнал нумерации")
     field(box, "Название *").fill(name)
     dropdown(auth_page, box, "Юридическое лицо *", env["le"]["name"])
@@ -134,7 +134,7 @@ def test_numbering_journal_form(auth_page: Page, env):
 def test_template_form(auth_page: Page, env, journal):
     name = f"{QA_PREFIX} Направление {stamp()}"
     open_hrm(auth_page, "/admin/doc-templates")
-    main(auth_page).get_by_role("button", name="Новый шаблон").click()
+    screen_action(auth_page, "Новый шаблон").click()
     box = modal(auth_page, "Новый шаблон")
     field(box, "Название *").fill(name)
     expect(field(box, "Тип документа")).to_contain_text("Контракт")

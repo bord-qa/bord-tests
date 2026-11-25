@@ -22,7 +22,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field, hrm_delete,
+from helpers.hrm import (screen_action, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field, hrm_delete,
                          header_button, hrm_get, hrm_json, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -92,9 +92,9 @@ def test_by_projects_view(auth_page: Page):
     projects = data.get("projects", data) if isinstance(data, dict) else data
     if not projects:
         expect(main(auth_page)).to_contain_text("Ещё нет проектов")
-        expect(main(auth_page).get_by_role("button", name="Создать проект")).to_be_visible()
+        expect(screen_action(auth_page, "Создать проект")).to_be_visible()
     header_button(auth_page, "По департаментам").click()
-    expect(main(auth_page).get_by_role("button", name="Добавить должность").first).to_be_visible()
+    expect(screen_action(auth_page, "Добавить должность").first).to_be_visible()
 
 
 # Кейс: Свой отдел — создать с юрлицом и руководителем, должность, подотдел, переименовать, архив

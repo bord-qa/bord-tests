@@ -21,7 +21,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+from helpers.hrm import (screen_action, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
                          header_button, hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -61,9 +61,9 @@ def stock(auth_page: Page):
 def test_catalog_item(auth_page: Page, stock):
     name = f"{QA_PREFIX} Ноутбук {stamp()}"
     open_hrm(auth_page, "/admin/tmc")
-    expect(main(auth_page).get_by_role("button", name="Каталог ТМЦ", exact=True)).to_be_visible()
+    expect(screen_action(auth_page, "Каталог ТМЦ", exact=True)).to_be_visible()
     header_button(auth_page, "Добавить").click() if header_button(auth_page, "Добавить").count() \
-        else main(auth_page).get_by_role("button", name="Добавить", exact=True).click()
+        else screen_action(auth_page, "Добавить", exact=True).click()
     box = auth_page.locator("div.fixed:visible").filter(has_text="Новый ТМЦ").last
     field(box, "Название *").fill(name)
     field(box, "Код").fill("QA-NB")
@@ -117,8 +117,8 @@ def test_issue_and_return(auth_page: Page, stock):
     try:
         assert item["quantity_on_hand"] == 5, item
         open_hrm(auth_page, "/admin/tmc")
-        main(auth_page).get_by_role("button", name="Выдача ТМЦ", exact=True).click()
-        main(auth_page).get_by_role("button", name="Выдать ТМЦ").click()
+        screen_action(auth_page, "Выдача ТМЦ", exact=True).click()
+        screen_action(auth_page, "Выдать ТМЦ").click()
         box = auth_page.locator("div.fixed:visible").filter(has_text="Выдать ТМЦ").last
         dropdown(auth_page, box, "Сотрудник *", emp["telegram_first_name"])
         dropdown(auth_page, box, "ТМЦ", f"{item['name']} (QA-H)")  # вариант — «Название (код)»
@@ -139,7 +139,7 @@ def test_issue_and_return(auth_page: Page, stock):
 
         # возврат: строка раскрывается в позиции → «Возврат» → «Оформить возврат»
         line.click()
-        main(auth_page).get_by_role("button", name="Возврат", exact=True).first.click()
+        screen_action(auth_page, "Возврат", exact=True).first.click()
         dlg = auth_page.locator("div.fixed:visible").filter(has_text="Оформить возврат").last
         expect(dlg).to_contain_text("Выдано: 2 · возвращено: 0 · осталось: 2")
         expect(field(dlg, "Количество *(до 2)")).to_have_value("2")

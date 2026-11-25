@@ -20,7 +20,7 @@
   удаляются — см. README, спорная логика);
 - «Статусы документов» — системные «Сгенерирован», «Подписан», «Отменён» (метка «Системный»,
   без удаления), свои добавляются полем «Название статуса»;
-- «Плагины» = GET/PUT /plugins {job_instructions, rent, hds_timesheet}: «Должностные
+- «Плагины» = GET/PUT /plugins {job_instructions, rent, hds_timesheet, tms_timesheet, workday_timesheet}: «Должностные
   инструкции» добавляют пункт меню; тест включает и возвращает как было;
 - «Импорт Nr. CIM» — без файла «Проверить» / «Заполнить» ничего не шлют (файл не грузим).
 """
@@ -29,7 +29,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, field, header_button,
+from helpers.hrm import (screen_action, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, field, header_button,
                          hrm_delete, hrm_get, hrm_json, hrm_put, items, open_hrm, sidebar, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -191,6 +191,23 @@ def test_relations_buttons_follow_api(auth_page: Page):
             expect(line.get_by_role("button", name="Базовое значение нельзя удалить")).to_be_disabled()
 
 
+PLUGINS = {"job_instructions": "Должностные инструкции", "rent": "Управление арендой",
+           "hds_timesheet": "Табель из трекера HDS", "tms_timesheet": "Табель из рейсов TMS",
+           "workday_timesheet": "Рабочий день"}
+
+
+# Кейс: «Плагины» — карточка на каждый ключ /plugins (с 25.11 их 5: + «Табель из рейсов TMS», «Рабочий день»),
+# метка «Включён» / «Выключен» = API
+def test_plugins_list(auth_page: Page):
+    state = hrm_json(hrm_get(auth_page, "/plugins"))
+    open_tab(auth_page, "Плагины")
+    assert set(state) == set(PLUGINS), f"плагины изменились: {sorted(state)}"
+    for key, title in PLUGINS.items():
+        card = main(auth_page).locator("div").filter(has=auth_page.get_by_text(title, exact=True)).filter(
+            has=auth_page.locator("button")).last
+        expect(card).to_contain_text("Включён" if state[key] else "Выключен")
+
+
 # Кейс: Плагин «Должностные инструкции» добавляет пункт меню
 @pytest.mark.writes_data
 def test_plugin_job_instructions(auth_page: Page):
@@ -234,7 +251,7 @@ def test_legal_entity_lifecycle(auth_page: Page):
     name, idno, iban = f"{QA_PREFIX} Юрлицо {stamp()}", "1009600099017", "MD24AG000225100013104168"
     open_tab(auth_page, "Юридические лица", "/legal-entities")
     try:
-        main(auth_page).get_by_role("button", name="Добавить юрлицо").click()
+        screen_action(auth_page, "Добавить юрлицо").click()
         form = main(auth_page)
         field(form, "Полное наименование *").fill(name)
         field(form, "IDNO (фискальный код)").fill(idno)
@@ -284,7 +301,7 @@ def test_legal_entity_in_use_is_not_deleted(auth_page: Page):
             dialog.get_by_role("button", name="Удалить", exact=True).click()
         assert resp.value.status in (400, 409, 422), f"юрлицо с сотрудником удалилось: {resp.value.status}"
         auth_page.reload()
-        main(auth_page).get_by_role("button", name="Юридические лица", exact=True).first.click()
+        screen_action(auth_page, "Юридические лица", exact=True).first.click()
         expect(le_card(auth_page, le["name"])).to_be_visible()
         assert le["id"] in [x["id"] for x in items(hrm_json(hrm_get(auth_page, "/legal-entities")))]
     finally:
@@ -312,7 +329,7 @@ def test_custom_field_for_employee(auth_page: Page):
     label = f"{QA_PREFIX} Поле {stamp()}"
     open_tab(auth_page, "Пользовательские поля")
     try:
-        main(auth_page).get_by_role("button", name="Добавить поле").click()
+        screen_action(auth_page, "Добавить поле").click()
         form = main(auth_page)
         expect(field(form, "Сущность")).to_contain_text("Сотрудник")
         expect(field(form, "Тип")).to_contain_text("Текст")
@@ -357,7 +374,7 @@ def test_document_statuses(auth_page: Page):
     try:
         main(auth_page).get_by_placeholder("Название статуса").fill(name)
         with auth_page.expect_response(lambda r: r.url.split("?")[0].endswith("/api/hrm/documents/statuses") and r.request.method == "POST") as resp:
-            main(auth_page).get_by_role("button", name="Добавить", exact=True).click()
+            screen_action(auth_page, "Добавить", exact=True).click()
         assert resp.value.ok, resp.value.text()
         st = resp.value.json()
         line = status_row(auth_page, name)  # своё название — в поле ввода (переименование на месте)
@@ -379,11 +396,11 @@ def test_own_relation(auth_page: Page):
     ru, ro = f"{QA_PREFIX} Кузен {tag}", f"{QA_PREFIX} Văr {tag}"
     open_tab(auth_page, "Степени родства", "/family/relations")
     try:
-        main(auth_page).get_by_role("button", name="Добавить", exact=True).click()
+        screen_action(auth_page, "Добавить", exact=True).click()
         main(auth_page).get_by_placeholder("Название (RU)").fill(ru)
         main(auth_page).get_by_placeholder("Название (RO)").fill(ro)
         with auth_page.expect_response(lambda r: r.url.split("?")[0].endswith("/api/hrm/family/relations") and r.request.method == "POST") as resp:
-            main(auth_page).get_by_role("button", name="Сохранить", exact=True).click()
+            screen_action(auth_page, "Сохранить", exact=True).click()
         assert resp.value.ok, resp.value.text()
         rel = resp.value.json()
         assert (rel["name_ru"], rel["name_ro"], rel.get("is_base", False)) == (ru, ro, False), rel

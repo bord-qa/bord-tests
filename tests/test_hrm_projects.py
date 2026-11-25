@@ -17,7 +17,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+from helpers.hrm import (screen_action, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
                          header_button, hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -80,7 +80,7 @@ def test_list_matches_api(auth_page: Page):
     projects = items(resp.value.json())
     if not projects:
         expect(main(auth_page)).to_contain_text("Ещё нет проектов")
-        expect(main(auth_page).get_by_role("button", name="Создать первый проект")).to_be_visible()
+        expect(screen_action(auth_page, "Создать первый проект")).to_be_visible()
     for p in projects:
         expect(main(auth_page).get_by_text(p["name"], exact=True).first).to_be_visible()
 

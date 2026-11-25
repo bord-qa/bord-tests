@@ -27,7 +27,7 @@ import openpyxl
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (HRM, QA_PREFIX, _headers, clean_up, create_employee, create_legal_entity, delete_employee,
+from helpers.hrm import (screen_action, HRM, QA_PREFIX, _headers, clean_up, create_employee, create_legal_entity, delete_employee,
                          dropdown, field, hrm_delete, hrm_get, hrm_json, hrm_patch, hrm_post, hrm_put, items, open_hrm,
                          sidebar, stamp)
 
@@ -83,7 +83,7 @@ def test_tmc_lost_status(auth_page: Page, person):
     t = issue_item(auth_page, person["id"], 3)
     assert stock(auth_page, t["item"]["id"]) == 2
     open_hrm(auth_page, "/admin/tmc")
-    main(auth_page).get_by_role("button", name="Выдача ТМЦ", exact=True).click()
+    screen_action(auth_page, "Выдача ТМЦ", exact=True).click()
     main(auth_page).locator("tr").filter(has_text=person["telegram_first_name"]).get_by_role("button", name="Открыть").click()
     card = dialog(auth_page, "Дата выдачи")
     card.get_by_role("button", name="Изменить статус").click()
@@ -120,7 +120,7 @@ def test_tmc_return_act(auth_page: Page, person):
     t = issue_item(auth_page, person["id"], 1)
     hrm_json(hrm_post(auth_page, f"/tmc/issues/{t['issue']['id']}/return-event", {"quantity": 1, "outcome": "returned"}))
     open_hrm(auth_page, "/admin/tmc")
-    main(auth_page).get_by_role("button", name="Выдача ТМЦ", exact=True).click()
+    screen_action(auth_page, "Выдача ТМЦ", exact=True).click()
     main(auth_page).locator("tr").filter(has_text=person["telegram_first_name"]).get_by_role("button", name="Открыть").click()
     card = dialog(auth_page, "Дата выдачи")
     card.get_by_role("button", name="Акт приёма", exact=True).click()
@@ -180,20 +180,20 @@ def test_candidate_files(auth_page: Page, tmp_path):
 def test_report_builder_filter_and_save(auth_page: Page, person):
     name = f"{QA_PREFIX} Отчёт {stamp()}"
     open_hrm(auth_page, "/admin/reports")
-    main(auth_page).get_by_role("button", name="Конструктор отчётов", exact=True).click()
-    main(auth_page).get_by_role("button", name="Добавить фильтр").click()
-    main(auth_page).get_by_role("button", name="ФИО", exact=True).first.click()
+    screen_action(auth_page, "Конструктор отчётов", exact=True).click()
+    screen_action(auth_page, "Добавить фильтр").click()
+    screen_action(auth_page, "ФИО", exact=True).first.click()
     auth_page.get_by_role("option", name="Имя", exact=True).click()
     main(auth_page).locator("input[type=text]:not([placeholder])").first.fill(person["telegram_first_name"])
     with auth_page.expect_response(lambda r: r.url.endswith("/report-builder/query")) as q:
-        main(auth_page).get_by_role("button", name="Применить", exact=True).click()
+        screen_action(auth_page, "Применить", exact=True).click()
     assert q.value.request.post_data_json["filters"] == [{"key": "first_name", "op": "contains",
                                                          "value": person["telegram_first_name"]}], q.value.request.post_data
     expect(main(auth_page)).to_contain_text("Найдено: 1")
     expect(main(auth_page).locator("tbody tr")).to_contain_text(person["telegram_first_name"])
     report_id = None
     try:
-        main(auth_page).get_by_role("button", name="Сохранить", exact=True).click()
+        screen_action(auth_page, "Сохранить", exact=True).click()
         box = dialog(auth_page, "Сохранить отчёт")
         expect(box).to_contain_text("Личный")
         box.locator("input").first.fill(name)
@@ -231,18 +231,18 @@ def test_cim_import(auth_page: Page, person, tmp_path):
     path = tmp_path / "qa-cim.xlsx"
     book.save(path)
     open_hrm(auth_page, "/admin/settings")
-    main(auth_page).get_by_role("button", name="Импорт Nr. CIM", exact=True).click()
+    screen_action(auth_page, "Импорт Nr. CIM", exact=True).click()
     expect(main(auth_page)).to_contain_text("«Nr. CIM», «IDNP», «Nume/Prenume», «Data angajării»")
     main(auth_page).locator("input[type=file]").set_input_files(str(path))
     with auth_page.expect_response(lambda r: "/contract-numbers/import-xlsx" in r.url) as dry:
-        main(auth_page).get_by_role("button", name="Проверить", exact=True).click()
+        screen_action(auth_page, "Проверить", exact=True).click()
     assert dry.value.ok and "dry_run=true" in dry.value.url, (dry.value.status, dry.value.url, dry.value.text()[:300])
     periods = lambda: [p.get("contract_number") for p in items(hrm_json(hrm_get(auth_page, f"/employees/{person['id']}/employments")))]  # noqa: E731
     assert number not in periods(), "проверка уже записала номер"
     expect(main(auth_page)).to_contain_text("Будет заполнено 1")
     expect(main(auth_page)).to_contain_text("Ничего не изменено.")
     expect(main(auth_page)).to_contain_text(f"{person['telegram_first_name']} Тестов · {TODAY:%d.%m.%Y} → {number}")
-    main(auth_page).get_by_role("button", name="Заполнить", exact=True).click()
+    screen_action(auth_page, "Заполнить", exact=True).click()
     sure = auth_page.locator("div.fixed.inset-0:visible").last  # подтверждение записи номеров
     with auth_page.expect_response(lambda r: "/contract-numbers/import-xlsx" in r.url) as real:
         expect(sure).to_be_visible()
@@ -267,7 +267,7 @@ def test_rent_plugin(auth_page: Page, person):
         if before["rent"]:
             hrm_put(auth_page, "/plugins", {**before, "rent": False})
         open_hrm(auth_page, "/admin/settings")
-        main(auth_page).get_by_role("button", name="Плагины", exact=True).click()
+        screen_action(auth_page, "Плагины", exact=True).click()
         card = plugin_card(auth_page, "Управление арендой")
         expect(card).to_contain_text("Выключен")
         with auth_page.expect_response(lambda r: r.url.endswith("/api/hrm/plugins") and r.request.method == "PUT") as on:
@@ -313,7 +313,7 @@ def test_hds_timesheet_plugin(auth_page: Page):
     before = hrm_json(hrm_get(auth_page, "/plugins"))
     try:
         open_hrm(auth_page, "/admin/settings")
-        main(auth_page).get_by_role("button", name="Плагины", exact=True).click()
+        screen_action(auth_page, "Плагины", exact=True).click()
         card = plugin_card(auth_page, "Табель из трекера HDS")
         expect(card).to_contain_text("Включён" if before["hds_timesheet"] else "Выключен")
         with auth_page.expect_response(lambda r: r.url.endswith("/api/hrm/plugins") and r.request.method == "PUT") as sw:

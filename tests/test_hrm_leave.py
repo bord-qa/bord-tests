@@ -23,7 +23,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
                          dropdown, field, hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -69,7 +69,7 @@ def staff(auth_page: Page):
 
 def new_request(page: Page, emp: dict, policy: dict, start: dt.date, end: dt.date, reason: str = ""):
     tab(page, "Заявки")
-    main(page).get_by_role("button", name="Новая заявка").click()
+    screen_action(page, "Новая заявка").click()
     box = page.locator("div.fixed:visible").filter(has_text="Новая заявка на отсутствие").last
     dropdown(page, box, "Сотрудник", emp["telegram_first_name"])
     dropdown(page, box, "Тип отсутствия *", policy["name"])
@@ -86,8 +86,8 @@ def test_tabs_and_requests(auth_page: Page):
         open_hrm(auth_page, "/admin/leave")
     reqs = items(resp.value.json())
     for name in TABS:
-        expect(main(auth_page).get_by_role("button", name=name, exact=True).first).to_be_visible()
-    expect(main(auth_page).get_by_role("button", name=f"Все ({len(reqs)})")).to_be_visible()
+        expect(screen_action(auth_page, name, exact=True)).to_be_visible()
+    expect(screen_action(auth_page, f"Все ({len(reqs)})")).to_be_visible()
     if not reqs:
         expect(main(auth_page)).to_contain_text("Нет заявок")
     with auth_page.expect_response(lambda r: "/api/hrm/leave/policies" in r.url) as pol:
@@ -102,7 +102,7 @@ def test_policy_create_and_delete(auth_page: Page, staff):
     name = f"{QA_PREFIX} Политика {stamp()}"
     open_hrm(auth_page, "/admin/leave")
     tab(auth_page, "Политики")
-    main(auth_page).get_by_role("button", name="Новая политика").click()
+    screen_action(auth_page, "Новая политика").click()
     box = auth_page.locator("div.fixed:visible").filter(has_text="Новая политика").last
     field(box, "Название *").fill(name)
     expect(field(box, "Тип")).to_contain_text("Накопительный (ежегодный)")

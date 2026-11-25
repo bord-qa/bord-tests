@@ -29,7 +29,7 @@ import datetime as dt
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (HRM, QA_PREFIX, _headers, clean_up, create_employee, create_legal_entity, date_field,
+from helpers.hrm import (screen_action, HRM, QA_PREFIX, _headers, clean_up, create_employee, create_legal_entity, date_field,
                          delete_employee, dropdown, field, hrm_delete, hrm_get, hrm_json, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -121,7 +121,7 @@ def test_secondary_employment(auth_page: Page, person):
     number = f"QA-SEC-{stamp()[-6:]}"
     open_card(auth_page, person, "Совместительство")
     expect(main(auth_page)).to_contain_text("Совместительство не оформлено")
-    main(auth_page).get_by_role("button", name="Добавить совместительство").click()
+    screen_action(auth_page, "Добавить совместительство").click()
     box = dialog(auth_page, "Добавить совместительство")
     field(box, "Юридическое лицо *").click()
     expect(auth_page.get_by_role("option").filter(has_text=f"{person['le']['name']} — внутреннее (основное юрлицо)")).to_be_visible()
@@ -141,7 +141,7 @@ def test_secondary_employment(auth_page: Page, person):
     expect(main(auth_page)).to_contain_text("50% (0,5 ставки)")
     expect(main(auth_page)).to_contain_text("Активно")
 
-    main(auth_page).get_by_role("button", name="Завершить", exact=True).click()
+    screen_action(auth_page, "Завершить", exact=True).click()
     box = dialog(auth_page, "Завершить совместительство")
     expect(box).to_contain_text("Это не увольнение из группы")
     date_field(box, "Дата окончания *").fill(str(TODAY))
@@ -163,7 +163,7 @@ def test_history_contract_number(auth_page: Page, person):
     expect(main(auth_page)).to_contain_text(f"{TODAY:%d.%m.%Y} — по настоящее время")
     expect(main(auth_page)).to_contain_text("Текущий")
     expect(main(auth_page)).to_contain_text(person["le"]["name"])
-    main(auth_page).get_by_role("button", name="Изменить номер договора").click()
+    screen_action(auth_page, "Изменить номер договора").click()
     box = dialog(auth_page, "Номер договора для этого периода")
     box.locator("input").fill(number)
     with auth_page.expect_response(lambda r: f"/employees/{person['id']}/periods/" in r.url and r.request.method == "PATCH") as upd:
@@ -210,8 +210,8 @@ def test_approval_chain(auth_page: Page):
     chain_id = None
     try:
         open_hrm(auth_page, "/admin/leave")
-        main(auth_page).get_by_role("button", name="Цепочки согласования", exact=True).click()
-        main(auth_page).get_by_role("button", name="Создать", exact=True).click()
+        screen_action(auth_page, "Цепочки согласования", exact=True).click()
+        screen_action(auth_page, "Создать", exact=True).click()
         box = dialog(auth_page, "Новая цепочка согласования")
         field(box, "Название").fill(name)
         dropdown(auth_page, box, "Применяется к", "Все")
@@ -226,25 +226,25 @@ def test_approval_chain(auth_page: Page):
         item.click()
         expect(main(auth_page)).to_contain_text("Нет шагов. Добавьте первый шаг.")
         with auth_page.expect_response(lambda r: f"/leave/approval-chains/{chain_id}" in r.url and r.request.method == "PUT") as s1:
-            main(auth_page).get_by_role("button", name="Добавить", exact=True).click()
+            screen_action(auth_page, "Добавить", exact=True).click()
         assert s1.value.ok and [st["approver_type"] for st in s1.value.json()["steps"]] == ["direct_manager"], s1.value.text()
         expect(main(auth_page)).to_contain_text("Обязательный")
 
         main(auth_page).get_by_role("button", name="Непосредственный руководитель", exact=True).last.click()
         auth_page.get_by_role("option", name="HR менеджер", exact=True).click()
         with auth_page.expect_response(lambda r: f"/leave/approval-chains/{chain_id}" in r.url and r.request.method == "PUT") as s2:
-            main(auth_page).get_by_role("button", name="Добавить", exact=True).click()
+            screen_action(auth_page, "Добавить", exact=True).click()
         assert s2.value.status == 422, s2.value.text()
         expect(main(auth_page)).to_contain_text("В организации не назначен HR-менеджер.")
 
         with auth_page.expect_response(lambda r: f"/leave/approval-chains/{chain_id}" in r.url and r.request.method == "PUT") as s3:
-            main(auth_page).get_by_role("button", name="Удалить шаг").first.click()
+            screen_action(auth_page, "Удалить шаг").first.click()
             confirm = auth_page.locator("div.fixed.inset-0:visible").get_by_role("button", name="Да", exact=True)
             if confirm.count():
                 confirm.click()
         assert s3.value.ok and s3.value.json()["steps"] == [], s3.value.text()
 
-        main(auth_page).get_by_role("button", name="Удалить цепочку").click()
+        screen_action(auth_page, "Удалить цепочку").click()
         sure = auth_page.locator("div.fixed.inset-0:visible").last
         with auth_page.expect_response(lambda r: f"/leave/approval-chains/{chain_id}" in r.url and r.request.method == "DELETE") as gone:
             sure.get_by_role("button", name="Да", exact=True).or_(sure.get_by_role("button", name="Удалить", exact=True)).first.click()

@@ -25,7 +25,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, ME, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown,
+from helpers.hrm import (screen_action, screen_tab, ME, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown,
                          field, hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -76,7 +76,7 @@ def test_headcount_overview(auth_page: Page, person):
     open_hrm(auth_page, "/admin/reports")
     expect(main(auth_page)).to_contain_text("Штат сотрудников")
     for name in ("Excel", "PDF"):
-        expect(main(auth_page).get_by_role("button", name=name, exact=True).first).to_be_visible()
+        expect(screen_action(auth_page, name, exact=True)).to_be_visible()
     by_le = section(auth_page, "По юрлицам")
     for row in report["by_legal_entity"]:
         expect(by_le).to_contain_text(row["legal_entity"])
@@ -96,7 +96,7 @@ def test_birthdays_report(auth_page: Page, person):
     open_hrm(auth_page, "/admin/reports")
     tab(auth_page, "Дни рождения")
     for m in ["Все"] + MONTHS:
-        expect(main(auth_page).get_by_role("button", name=m, exact=True)).to_be_visible()
+        expect(screen_action(auth_page, m, exact=True)).to_be_visible()
     expect(main(auth_page)).to_contain_text(f"Дни рождения — {MONTH_NAMES[TODAY.month - 1]} ({report['total']})")
     rows = main(auth_page).locator("tbody tr")
     expect(rows).to_have_count(report["total"])
@@ -105,7 +105,7 @@ def test_birthdays_report(auth_page: Page, person):
     age = TODAY.year - 1990 - ((TODAY.month, TODAY.day) < (person["born"].month, person["born"].day))
     expect(row).to_contain_text(str(age))
     other = MONTHS[(TODAY.month % 12)]  # следующий месяц — своего сотрудника там нет
-    main(auth_page).get_by_role("button", name=other, exact=True).click()
+    screen_action(auth_page, other, exact=True).click()
     expect(rows.filter(has_text=person["telegram_first_name"])).to_have_count(0)
 
 
@@ -174,8 +174,9 @@ def test_notification_rule(auth_page: Page):
     name = f"{QA_PREFIX} Правило {stamp()}"
     open_hrm(auth_page, "/admin/notifications")
     tab(auth_page, "Правила")
-    expect(main(auth_page)).to_contain_text("Правила определяют, кому и когда отправляются уведомления")
-    main(auth_page).get_by_role("button", name="Создать правило").click()
+    # описание вкладки с ~20.11 в шапке рядом с вкладками
+    expect(auth_page.locator("body")).to_contain_text("Правила определяют, кому и когда отправляются уведомления")
+    screen_action(auth_page, "Создать правило").click()
     box = modal(auth_page, "Новое правило")
     rule_id = None
     try:

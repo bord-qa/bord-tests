@@ -22,7 +22,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
                          dropdown, field, hrm_delete, hrm_get, hrm_json, hrm_post, hrm_put, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -80,7 +80,7 @@ def test_certificate_form(auth_page: Page, person):
     expires = TODAY.replace(year=TODAY.year + 2)
     open_hrm(auth_page, "/admin/skills")
     tab(auth_page, "Сертификаты")
-    main(auth_page).get_by_role("button", name="Добавить сертификат").click()
+    screen_action(auth_page, "Добавить сертификат").click()
     box = modal(auth_page, "Добавить сертификат")
     dropdown(auth_page, box, "Сотрудник *", person["telegram_first_name"])
     box_skill = field(box, "Навык (опционально)")

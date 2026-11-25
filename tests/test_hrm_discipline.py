@@ -35,7 +35,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
                          dropdown, field, hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -116,7 +116,7 @@ def test_violation_type_crud(auth_page: Page, discipline):
     open_hrm(auth_page, "/admin/discipline")
     tab(auth_page, "Типы нарушений")
     expect(main(auth_page)).to_contain_text("Каталог типов нарушений")
-    main(auth_page).get_by_role("button", name="Добавить тип").click()
+    screen_action(auth_page, "Добавить тип").click()
     box = modal(auth_page, "Новый тип нарушения")
     field(box, "Код").fill(vt_code)
     field(box, "Название").fill(name)
@@ -179,7 +179,7 @@ def test_violation_create_and_cancel(auth_page: Page, person, vtype):
     auth_page.on("request", lambda r: posts.append(r.url) if r.url.endswith("/discipline/violations/") and r.method == "POST" else None)
     open_hrm(auth_page, "/admin/discipline")
     tab(auth_page, "Нарушения")
-    main(auth_page).get_by_role("button", name="Создать", exact=True).click()
+    screen_action(auth_page, "Создать", exact=True).click()
     box = modal(auth_page, "Новое нарушение")
     expect(field(box, "Тяжесть")).to_contain_text("Незначительное")
     dropdown(auth_page, box, "Тип нарушения", vtype["name"])
@@ -209,7 +209,7 @@ def test_violation_create_and_cancel(auth_page: Page, person, vtype):
     for step in ("Зафиксировано", "Объяснительная", "Решение", "Подписание", f"{QA_PREFIX} опоздал на 40 минут"):
         expect(main(auth_page)).to_contain_text(step)
 
-    main(auth_page).get_by_role("button", name="Отменить нарушение").click()
+    screen_action(auth_page, "Отменить нарушение").click()
     dlg = modal(auth_page, "Отменить нарушение")
     expect(dlg.get_by_role("button", name="Отменить", exact=True)).to_be_disabled()
     reason = f"{QA_PREFIX} заведено ошибочно {stamp()}"
@@ -237,7 +237,7 @@ def test_violation_edit(auth_page: Page, person, vtype):
     open_hrm(auth_page, "/admin/discipline")
     tab(auth_page, "Нарушения")
     main(auth_page).get_by_role("button").filter(has_text=person["telegram_first_name"]).click()
-    main(auth_page).get_by_role("button", name="Редактировать", exact=True).click()
+    screen_action(auth_page, "Редактировать", exact=True).click()
     box = modal(auth_page, "Редактировать нарушение")
     dropdown(auth_page, box, "Тяжесть", "Среднее")
     with auth_page.expect_response(lambda r: "/discipline/violations/" in r.url and r.request.method == "PUT") as upd:
@@ -253,8 +253,8 @@ def test_violation_edit(auth_page: Page, person, vtype):
 def test_trial_period(auth_page: Page, person):
     emp = person
     open_hrm(auth_page, "/admin/discipline")
-    expect(main(auth_page).get_by_role("button", name="Испытательный срок", exact=True)).to_be_visible()
-    main(auth_page).get_by_role("button", name="Создать", exact=True).click()
+    expect(screen_action(auth_page, "Испытательный срок", exact=True)).to_be_visible()
+    screen_action(auth_page, "Создать", exact=True).click()
     box = modal(auth_page, "Новый испытательный срок")
     dropdown(auth_page, box, "Сотрудник", emp["telegram_first_name"])
     expect(date_field(box, "Начало")).to_have_value(str(TODAY))
@@ -270,14 +270,14 @@ def test_trial_period(auth_page: Page, person):
     expect(item).to_contain_text("Активный")
     expect(item).to_contain_text(f"{TODAY.strftime('%d.%m.%Y')} — {ddmmyyyy(trial['end_date'])} (3 мес.)")
 
-    main(auth_page).get_by_role("button", name="Пройден", exact=True).click()
+    screen_action(auth_page, "Пройден", exact=True).click()
     expect(item).to_have_count(0)
-    main(auth_page).get_by_role("button", name="Активный", exact=True).click()
+    screen_action(auth_page, "Активный", exact=True).click()
     expect(item).to_have_count(1)
 
     item.click()
     expect(main(auth_page)).to_contain_text("Длительность")
-    main(auth_page).get_by_role("button", name="Редактировать", exact=True).click()
+    screen_action(auth_page, "Редактировать", exact=True).click()
     box = modal(auth_page, "Редактировать ИС")
     expect(date_field(box, "Окончание")).to_have_value(trial["end_date"])
     extended = str(dt.date.fromisoformat(trial["end_date"]) + dt.timedelta(days=28))

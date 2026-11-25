@@ -24,7 +24,7 @@ import openpyxl
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee, field, hrm_delete,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee, field, hrm_delete,
                          hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -79,7 +79,7 @@ def test_journal_report(auth_page: Page, person):
     tab(auth_page, "Отчёт по журналам")
     for th in ("Номер документа", "Имя", "Фамилия", "ИДНП", "Юрлицо", "Шаблон", "Журнал", "Дата", "Статус"):
         expect(main(auth_page).locator("th").filter(has_text=th).first).to_be_visible()
-    main(auth_page).get_by_role("button", name="Все юрлица", exact=True).click()
+    screen_action(auth_page, "Все юрлица", exact=True).click()
     with auth_page.expect_response(lambda r: "/reports/contract-numbers" in r.url and f"legal_entity_id={person['le']['id']}" in r.url):
         auth_page.get_by_role("option", name=person["le"]["name"], exact=True).click()
     rows = main(auth_page).locator("tbody tr")
@@ -106,11 +106,11 @@ def test_report_downloads(auth_page: Page, tab_name):
     open_hrm(auth_page, "/admin/reports")
     tab(auth_page, tab_name)
     with auth_page.expect_download(timeout=60_000) as xl:
-        main(auth_page).get_by_role("button", name="Excel", exact=True).first.click()
+        screen_action(auth_page, "Excel", exact=True).first.click()
     book = openpyxl.load_workbook(io.BytesIO(open(xl.value.path(), "rb").read()))  # временный файл без расширения
     assert xl.value.suggested_filename.endswith(".xlsx") and book.active.max_row >= 1, xl.value.suggested_filename
     with auth_page.expect_download(timeout=60_000) as pdf:
-        main(auth_page).get_by_role("button", name="PDF", exact=True).first.click()
+        screen_action(auth_page, "PDF", exact=True).first.click()
     assert pdf.value.suggested_filename.endswith(".pdf") and open(pdf.value.path(), "rb").read(5) == b"%PDF-", \
         pdf.value.suggested_filename
 

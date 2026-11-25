@@ -15,13 +15,12 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (HRM, QA_PREFIX, pick_raise_manager, field, hrm_delete, hrm_get, hrm_json, hrm_me, hrm_post, items, open_hrm,
+from helpers.hrm import (screen_action, HRM, QA_PREFIX, pick_raise_manager, field, hrm_delete, hrm_get, hrm_json, hrm_me, hrm_post, items, open_hrm,
                          screen_title, sidebar, stamp)
 
 pytestmark = pytest.mark.requires_auth
 
 COLLEAGUE_ID = 1767
-RAISE_NOTIFICATION = "Новая заявка на повышение зарплаты"
 
 
 def main(page: Page):
@@ -109,12 +108,16 @@ def test_screen_in_romanian(ro: Page, path, title, tabs):
     open_hrm(ro, path)
     expect(screen_title(ro)).to_have_attribute("title", title)
     for name in tabs:
-        expect(main(ro).get_by_role("button", name=name, exact=True).first).to_be_visible()
+        expect(screen_action(ro, name, exact=True)).to_be_visible()
     labels = main(ro).locator("button, th, label, h1, h2, h3").evaluate_all(
         "els => els.filter(e => e.offsetParent && e.children.length <= 2).map(e => e.innerText.trim())")
+    # Лента уведомлений — данные, а не интерфейс: текст собирается на языке ПРОФИЛЯ получателя в хабе в момент
+    # отправки (решение по bord-179), а тест меняет только язык экрана HRM (кука). Профиль тест-учётки — русский.
+    feed = set()
+    if path == "/admin/notifications":
+        for n in items(hrm_json(hrm_get(ro, "/notifications/", {"limit": 100}))):
+            feed.update(filter(None, (n.get("title"), n.get("body"))))
     cyrillic = [t for t in labels if re.search(r"[А-Яа-яЁё]", t) and not t.startswith(QA_PREFIX)
+                and not any(t.startswith(x) or x.startswith(t) for x in feed)
                 and not re.search(r"QA Autotest|\[QA-AUTO\]|Акт (выдачи|приёма) ТМЦ|Системный шаблон", t)]
-    # bord-179: уведомление о заявке на повышение не переводится (остальные типы переведены)
-    if cyrillic and all(t.startswith(RAISE_NOTIFICATION) for t in cyrillic):
-        pytest.xfail(f"bord-179: «{RAISE_NOTIFICATION} …» в Română не переведено")
     assert not cyrillic, f"кириллица в интерфейсе {path}: {cyrillic[:5]}"

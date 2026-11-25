@@ -245,5 +245,6 @@ def test_greeting_settings_autosave(auth_page: Page, settings_back):
     expect(block).to_be_visible()
     state = [h for h in items(hrm_json(hrm_get(auth_page, "/greetings/holidays"))) if h["source"] == "state"]
     assert state, "нет государственных праздников"
-    for h in state:
-        expect(main(auth_page).get_by_text(h["name"], exact=True).first).to_be_visible()
+    for h in state:  # строка — label «<input> <span>ДД.ММ</span>Название» (название — голый текст после даты)
+        line = main(auth_page).locator("label").filter(has_text=re.compile(rf"{re.escape(h['name'])}\s*$"))
+        expect(line.first).to_be_visible()

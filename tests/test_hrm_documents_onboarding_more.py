@@ -23,7 +23,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
                          person_name,
                          hrm_delete, hrm_get, hrm_json, hrm_post, hrm_put, items, open_hrm, stamp)
 
@@ -86,7 +86,7 @@ def test_package_form(auth_page: Page):
     name = f"{QA_PREFIX} Пакет форма {stamp()}"
     open_hrm(auth_page, "/admin/doc-templates")
     tab(auth_page, "Пакеты документов")
-    main(auth_page).get_by_role("button", name="Добавить пакет").click()
+    screen_action(auth_page, "Добавить пакет").click()
     box = dialog(auth_page, "Новый пакет документов")
     with auth_page.expect_response(lambda r: r.url.endswith("/doc-templates/types") and r.request.method == "POST") as resp:
         field(box, "Название *").fill(name)
@@ -105,7 +105,7 @@ def test_package_form(auth_page: Page):
 def test_generate_package_from_card(auth_page: Page, env):
     open_documents_tab(auth_page, env["emp"])
     expect(main(auth_page)).to_contain_text("Документов пока нет")  # пустая вкладка — своя кнопка
-    main(auth_page).get_by_role("button", name="Сгенерировать документ", exact=True).click()
+    screen_action(auth_page, "Сгенерировать документ", exact=True).click()
     box = dialog(auth_page, "Сгенерировать документ")
     expect(box).to_contain_text(f"Для: {person_name(env['emp'])}")  # с 17.11 «Фамилия Имя»
     box.get_by_role("button", name="Пакет по типу", exact=True).click()
@@ -171,7 +171,7 @@ def test_offboarding_template(auth_page: Page):
     name = f"{QA_PREFIX} Offboarding {stamp()}"
     open_hrm(auth_page, "/admin/onboarding")
     tab(auth_page, "Шаблоны")
-    main(auth_page).get_by_role("button", name="Создать шаблон").click()
+    screen_action(auth_page, "Создать шаблон").click()
     box = dialog(auth_page, "Новый шаблон")
     field(box, "Название *").fill(name)
     dropdown(auth_page, box, "Тип", "Offboarding")

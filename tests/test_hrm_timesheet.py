@@ -21,7 +21,7 @@ import openpyxl
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, field, header_button,
+from helpers.hrm import (screen_action, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, field, header_button,
                          hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -85,10 +85,10 @@ def test_grid_and_month_navigation(auth_page: Page):
 
     nxt = (MONTH_END + dt.timedelta(days=1))
     with auth_page.expect_response(lambda r: "/api/hrm/timesheet/summary" in r.url and f"date_from={nxt}" in r.url):
-        main(auth_page).get_by_role("button", name="Следующий месяц").click()
+        screen_action(auth_page, "Следующий месяц").click()
     expect(main(auth_page)).to_contain_text(f"{MONTHS[nxt.month - 1]} {nxt.year}")
     with auth_page.expect_response(lambda r: "/api/hrm/timesheet/summary" in r.url and f"date_from={MONTH_START}" in r.url):
-        main(auth_page).get_by_role("button", name="Предыдущий месяц").click()
+        screen_action(auth_page, "Предыдущий месяц").click()
     expect(main(auth_page)).to_contain_text(f"{MONTHS[TODAY.month - 1]} {TODAY.year}")
 
 
@@ -171,7 +171,7 @@ def test_export(auth_page: Page):
     open_hrm(auth_page, "/admin/timesheet")
     with auth_page.expect_download() as dl:
         header_button(auth_page, "Скачать табель").click() if header_button(auth_page, "Скачать табель").count() \
-            else main(auth_page).get_by_role("button", name="Скачать табель").click()
+            else screen_action(auth_page, "Скачать табель").click()
         menu_item = auth_page.get_by_role("button", name=re.compile("^(Скачать|Excel)"), exact=False)
         auth_page.wait_for_timeout(800)
         if menu_item.count() > 1:
@@ -192,7 +192,7 @@ def test_public_holiday_marked(auth_page: Page):
             break
         month = (month + dt.timedelta(days=32)).replace(day=1)
         with auth_page.expect_response(lambda r: "/api/hrm/timesheet/summary" in r.url and f"date_from={month}" in r.url):
-            main(auth_page).get_by_role("button", name="Следующий месяц").click()
+            screen_action(auth_page, "Следующий месяц").click()
     else:
         pytest.skip("гос. выходных в ближайший год нет")
     assert (hol["enabled"], hol["country"]) == (True, "MD"), hol

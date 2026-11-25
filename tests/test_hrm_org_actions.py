@@ -34,7 +34,7 @@ import openpyxl
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, hrm_delete, hrm_get, hrm_json,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, hrm_delete, hrm_get, hrm_json,
                          hrm_post, hrm_put, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -135,7 +135,7 @@ def test_timesheet_fill_day_for_all(auth_page: Page, person):
     day = next_workday(TODAY)
     open_hrm(auth_page, "/admin/timesheet")
     if day.month != TODAY.month:
-        main(auth_page).get_by_role("button", name="Следующий месяц").click()
+        screen_action(auth_page, "Следующий месяц").click()
     with auth_page.expect_response(lambda r: r.url.endswith("/timesheet/bulk-fill/plan")) as plan:
         header = main(auth_page).locator("th").filter(has=auth_page.locator('button[title="Проставить 8 часов всем за этот день"]'))
         header.filter(has_text=re.compile(rf"^\s*{day.day}\b")).first.locator(
@@ -185,7 +185,7 @@ def test_timesheet_fill_month_one_employee(auth_page: Page, person):
                                                                 "date_to": body["date_to"]})))
     assert len(entries) == op["filled"] and all(dt.date.fromisoformat(e["entry_date"]).weekday() < 5 for e in entries), entries
     with auth_page.expect_response(lambda r: f"/bulk-fill/{op['op_id']}/undo" in r.url) as undo:
-        main(auth_page).get_by_role("button", name="Отменить", exact=True).click()
+        screen_action(auth_page, "Отменить", exact=True).click()
     assert undo.value.ok, undo.value.text()
     assert items(hrm_json(hrm_get(auth_page, "/timesheet/", {"employee_id": person["id"], "date_from": body["date_from"],
                                                              "date_to": body["date_to"]}))) == []
@@ -195,7 +195,7 @@ def test_timesheet_fill_month_one_employee(auth_page: Page, person):
 @pytest.mark.writes_data
 def test_timesheet_fill_norm_all(auth_page: Page, person):
     open_hrm(auth_page, "/admin/timesheet")
-    main(auth_page).get_by_role("button", name="Заполнить по норме", exact=True).click()
+    screen_action(auth_page, "Заполнить по норме", exact=True).click()
     box = fill_dialog(auth_page)
     expect(box).to_contain_text("Будет заполнено:")
     with auth_page.expect_response(lambda r: r.url.endswith("/timesheet/bulk-fill") and r.request.method == "POST") as fill:
@@ -213,8 +213,8 @@ def test_timesheet_fill_norm_all(auth_page: Page, person):
 @pytest.mark.writes_data
 def test_leave_balances_refresh(auth_page: Page):
     open_hrm(auth_page, "/admin/leave")
-    main(auth_page).get_by_role("button", name=re.compile(r"^Балансы")).click()
-    main(auth_page).get_by_role("button", name="Обновить", exact=True).click()
+    screen_action(auth_page, re.compile(r"^\s*Балансы")).click()
+    screen_action(auth_page, "Обновить", exact=True).click()
     sure = dialog(auth_page, "Инициализировать балансы для всех сотрудников по активным политикам?")
     with auth_page.expect_response(lambda r: "/leave/balances/initialize" in r.url) as init:
         sure.get_by_role("button", name="Да", exact=True).click()
@@ -233,7 +233,7 @@ def test_leave_balances_refresh(auth_page: Page):
 def test_export_format(auth_page: Page, person):
     picked = ["Фамилия Имя", "IDNP", "Дата найма"]
     open_hrm(auth_page, "/admin/settings")
-    main(auth_page).get_by_role("button", name="Формат экспорта", exact=True).click()
+    screen_action(auth_page, "Формат экспорта", exact=True).click()
     box = main(auth_page)
     try:
         expect(box).to_contain_text("Колонки выгрузки (0)")

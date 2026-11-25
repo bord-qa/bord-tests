@@ -21,7 +21,7 @@ import datetime as dt
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, RAISE_MANAGER, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+from helpers.hrm import (screen_action, QA_PREFIX, RAISE_MANAGER, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
                          hrm_delete, hrm_get, hrm_json, hrm_post, hrm_put, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -77,7 +77,7 @@ def open_kanban(page: Page, board: dict):
     open_hrm(page, "/admin/recruitment/vacancies")
     page.wait_for_load_state("networkidle")  # до гидрации кнопки канбана не срабатывают
     page.locator("header button:visible").filter(has_text="Канбан").first.click()
-    expect(main(page).get_by_role("button", name="Настроить воронки")).to_be_visible()
+    expect(screen_action(page, "Настроить воронки")).to_be_visible()
     pipe = main(page).get_by_role("button").filter(has_text=board["pipeline"]["name"])
     if not pipe.count():
         main(page).locator("button[aria-haspopup=listbox]").first.click()
@@ -111,7 +111,7 @@ def test_kanban_drag_candidate(auth_page: Page, board):
 def test_pipeline_settings(auth_page: Page, board):
     name = f"{QA_PREFIX} Воронка форма {stamp()}"
     open_kanban(auth_page, board)
-    main(auth_page).get_by_role("button", name="Настроить воронки").click()
+    screen_action(auth_page, "Настроить воронки").click()
     box = dialog(auth_page, "Настройка воронок")
     expect(box).to_contain_text(f"{board['pipeline']['name']}")
     expect(box).to_contain_text("3 этапов")

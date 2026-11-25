@@ -30,7 +30,7 @@ import openpyxl
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
+from helpers.hrm import (screen_action, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
                          dropdown, field, header_button, hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm,
                          person_name, screen_title, stamp)
 
@@ -193,7 +193,7 @@ def test_dismiss_and_restore(auth_page: Page, person):
     # после перезагрузки — во вкладке «Неактивные», в «Активных» нет
     open_hrm(auth_page, "/admin/employees")
     expect(list_row(auth_page, full_name(person))).to_have_count(0)
-    main(auth_page).get_by_role("button", name="Неактивные", exact=True).click()
+    screen_action(auth_page, "Неактивные", exact=True).click()
     list_row(auth_page, full_name(person)).click()
 
     card(auth_page).get_by_role("button", name="Уволен", exact=True).click()

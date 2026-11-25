@@ -28,7 +28,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
                          dropdown, field, header_button, hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -105,8 +105,8 @@ def test_goal_with_key_result(auth_page: Page, person):
     title, kr = f"{QA_PREFIX} Цель {stamp()}", f"{QA_PREFIX} KR закрыть 10 задач"
     open_hrm(auth_page, "/admin/performance")
     for name in ("Цели / OKR", "Циклы оценки", "1-on-1", "Обратная связь"):
-        expect(main(auth_page).get_by_role("button", name=name, exact=True)).to_be_visible()
-    main(auth_page).get_by_role("button", name="Создать цель").click()
+        expect(screen_action(auth_page, name, exact=True)).to_be_visible()
+    screen_action(auth_page, "Создать цель").click()
     box = modal(auth_page, "Новая цель")
     field(box, "Название *").fill(title)
     expect(field(box, "Тип цели")).to_contain_text("Индивидуальная")
@@ -139,7 +139,7 @@ def test_goal_with_key_result(auth_page: Page, person):
 def test_one_on_one(auth_page: Page, person):
     open_hrm(auth_page, "/admin/performance")
     tab(auth_page, "1-on-1")
-    main(auth_page).get_by_role("button", name="Запланировать 1-on-1").click()
+    screen_action(auth_page, "Запланировать 1-on-1").click()
     box = modal(auth_page, "Запланировать 1-on-1")
     dropdown(auth_page, box, "Сотрудник *", person["telegram_first_name"])
     date_field(box, "Дата и время *").fill(f"{TOMORROW}T10:00")
@@ -163,7 +163,7 @@ def test_engagement_lists(auth_page: Page):
     surveys = items(hrm_json(hrm_get(auth_page, "/engagement/surveys")))
     events = items(hrm_json(hrm_get(auth_page, "/engagement/events")))
     open_hrm(auth_page, "/admin/engagement")
-    expect(main(auth_page).get_by_role("button", name="Создать опрос")).to_be_visible()
+    expect(screen_action(auth_page, "Создать опрос")).to_be_visible()
     if surveys:
         for s in surveys:
             expect(main(auth_page)).to_contain_text(s["title"])

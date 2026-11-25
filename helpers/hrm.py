@@ -182,10 +182,14 @@ def screen_tab(page: Page, name: str):
         page.locator("main").get_by_role("button", name=name, exact=True)).first
 
 
-def screen_action(page: Page, name: str):
-    """Кнопка действия экрана («Создать грейд», «Добавить запись», «Создать льготу»…). С ~20.11.2026
-    уехала из тела экрана в шапку вместе с вкладками — ищем так же, как screen_tab."""
-    return screen_tab(page, name)
+def screen_action(page: Page, name, exact: bool = False):
+    """Кнопка действия экрана («Создать грейд», «Добавить навык», «Цепочки согласования»…). С ~20.11.2026
+    уехала из тела экрана в шапку вместе с вкладками: ищем в видимой шапке (точная подпись), потом в main
+    (как раньше — exact по желанию)."""
+    # name — подпись или регулярка (для кнопок со счётчиком: re.compile(r"^Балансы"))
+    label = name if isinstance(name, re.Pattern) else re.compile(rf"^\s*{re.escape(name)}\s*$")
+    return page.locator("header button:visible").filter(has_text=label).or_(
+        page.locator("main").get_by_role("button", name=name, exact=exact)).first
 
 
 def date_field(box, label: str):

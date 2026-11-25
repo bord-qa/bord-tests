@@ -34,7 +34,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (HRM, QA_PREFIX, clean_up, delete_employee, dropdown, field, hrm_delete, hrm_get, hrm_json,
+from helpers.hrm import (screen_action, HRM, QA_PREFIX, clean_up, delete_employee, dropdown, field, hrm_delete, hrm_get, hrm_json,
                          hrm_post, hrm_put, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -111,7 +111,7 @@ def get_job(page: Page, job_id: int) -> dict:
 # Кейс: Дашборд рекрутинга — навигация раздела, фильтры периода, счётчики = /recruit/stats
 def test_recruitment_dashboard(auth_page: Page):
     open_hrm(auth_page, "/admin/recruitment")
-    nav = main(auth_page).get_by_role("link")
+    nav = auth_page.locator("header a:visible").or_(main(auth_page).get_by_role("link"))  # с ~20.11 навигация раздела в шапке
     for name, href in (("Дашборд", "/admin/recruitment"), ("Вакансии", "/admin/recruitment/vacancies"),
                        ("Кандидаты", "/admin/recruitment/candidates"), ("Источники", "/admin/recruitment/sources")):
         expect(nav.filter(has_text=name).first).to_have_attribute("href", href)
@@ -119,7 +119,7 @@ def test_recruitment_dashboard(auth_page: Page):
     expect(main(auth_page)).to_contain_text(f"Период: {month_ago} -- {TODAY}")
     for label in ("С даты", "По дату"):
         expect(main(auth_page).get_by_text(label, exact=True)).to_be_visible()
-    expect(main(auth_page).get_by_role("button", name="Применить")).to_be_visible()
+    expect(screen_action(auth_page, "Применить")).to_be_visible()
     stats = hrm_json(hrm_get(auth_page, "/recruit/stats"))
     assert set(stats) >= {"open_jobs", "active_applications", "hired_this_month", "candidate_pool"}, stats
 
@@ -129,7 +129,7 @@ def test_recruitment_dashboard(auth_page: Page):
 def test_vacancy_form(auth_page: Page, pipeline):
     title = f"{QA_PREFIX} Вакансия {stamp()}"
     open_hrm(auth_page, "/admin/recruitment/vacancies")
-    main(auth_page).get_by_role("button", name="Новая вакансия").click()
+    screen_action(auth_page, "Новая вакансия").click()
     box = modal(auth_page, "Новая вакансия")
     field(box, "Название *").fill(title)
     dropdown(auth_page, box, "Воронка", pipeline["name"])
@@ -164,9 +164,9 @@ def test_vacancy_form(auth_page: Page, pipeline):
     auth_page.keyboard.press("Escape")
 
     auth_page.goto(HRM + "/admin/recruitment/vacancies")
-    main(auth_page).get_by_role("button", name="Черновик", exact=True).click()
+    screen_action(auth_page, "Черновик", exact=True).click()
     expect(main(auth_page).locator("tbody tr").filter(has_text=title)).to_have_count(0)
-    main(auth_page).get_by_role("button", name="Открыта", exact=True).click()
+    screen_action(auth_page, "Открыта", exact=True).click()
     expect(main(auth_page).locator("tbody tr").filter(has_text=title)).to_have_count(1)
 
 
@@ -176,7 +176,7 @@ def test_candidate_flow(auth_page: Page, job):
     first, src = f"{QA_PREFIX} Кандидат {stamp()}", f"{QA_PREFIX} Источник {stamp()}"
     stages = job["pipeline"]["stages"]
     open_hrm(auth_page, "/admin/recruitment/candidates")
-    main(auth_page).get_by_role("button", name="Добавить кандидата").click()
+    screen_action(auth_page, "Добавить кандидата").click()
     box = modal(auth_page, "Добавить кандидата")
     field(box, "Имя *").fill(first)
     field(box, "Фамилия").fill("Тестовый")

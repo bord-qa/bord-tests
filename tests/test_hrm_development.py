@@ -37,7 +37,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+from helpers.hrm import (screen_action, screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
                          hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -110,7 +110,7 @@ def test_onboarding_template_and_process(auth_page: Page, person):
     for tile in ("Активных", "Завершено в этом месяце", "Просрочено", "Средний прогресс"):
         expect(main(auth_page)).to_contain_text(tile)
     tab(auth_page, "Шаблоны")
-    main(auth_page).get_by_role("button", name="Создать шаблон").click()
+    screen_action(auth_page, "Создать шаблон").click()
     box = modal(auth_page, "Новый шаблон")
     field(box, "Название *").fill(name)
     expect(field(box, "Тип")).to_contain_text("Адаптация")
@@ -139,7 +139,7 @@ def test_onboarding_template_and_process(auth_page: Page, person):
     expect(card).to_contain_text("+3д.")
 
     tab(auth_page, "Активные процессы")
-    main(auth_page).get_by_role("button", name="Запустить онбординг").click()
+    screen_action(auth_page, "Запустить онбординг").click()
     box = modal(auth_page, "Запустить онбординг")
     field(box, "Сотрудник *").click()  # варианты подписаны «undefined (<имя>)» — bord-54, берём по подстроке
     auth_page.get_by_role("option").filter(has_text=emp["telegram_first_name"]).click()
@@ -162,7 +162,7 @@ def test_onboarding_template_and_process(auth_page: Page, person):
     line.locator("xpath=./button").click()
     expect(main(auth_page)).to_contain_text("Изменить статус")
     with auth_page.expect_response(lambda r: "/onboard/tasks/" in r.url and r.url.endswith("/status")) as st:
-        main(auth_page).get_by_role("button", name="Выполнено", exact=True).click()
+        screen_action(auth_page, "Выполнено", exact=True).click()
     assert st.value.ok and st.value.json()["progress"] == 100, st.value.text()
     assert st.value.request.post_data_json == {"status": "completed"}
     expect(item).to_contain_text("Завершён")
@@ -174,7 +174,7 @@ def test_onboarding_template_and_process(auth_page: Page, person):
 # Кейс: «Запустить онбординг» — сотрудники в выпадашке подписаны своими именами
 def test_onboarding_employee_options(auth_page: Page, person):
     open_hrm(auth_page, "/admin/onboarding")
-    main(auth_page).get_by_role("button", name="Запустить онбординг").click()
+    screen_action(auth_page, "Запустить онбординг").click()
     box = modal(auth_page, "Запустить онбординг")
     field(box, "Сотрудник *").click()
     options = auth_page.get_by_role("option")
@@ -207,7 +207,7 @@ def test_onboarding_template_delete(auth_page: Page, dev):
 def test_skill_catalog_and_matrix(auth_page: Page, person):
     emp, name = person, f"{QA_PREFIX} Румынский {stamp()}"
     open_hrm(auth_page, "/admin/skills")
-    main(auth_page).get_by_role("button", name="Добавить навык").click()
+    screen_action(auth_page, "Добавить навык").click()
     box = modal(auth_page, "Добавить навык")
     field(box, "Название *").fill(name)
     expect(field(box, "Категория")).to_contain_text("Технический")
@@ -221,7 +221,7 @@ def test_skill_catalog_and_matrix(auth_page: Page, person):
     expect(main(auth_page)).to_contain_text(name)
 
     tab(auth_page, "Матрица")
-    main(auth_page).get_by_role("button", name="Назначить навык").click()
+    screen_action(auth_page, "Назначить навык").click()
     box = modal(auth_page, "Назначить навык")
     dropdown(auth_page, box, "Сотрудник *", emp["telegram_first_name"])
     dropdown(auth_page, box, "Навык *", f"{name} Языки")
@@ -274,7 +274,7 @@ def test_training_program_enroll(auth_page: Page, person):
     for tile in ("Общие затраты на обучение", "Активные обучения", "Ожидающие удержания"):
         expect(main(auth_page)).to_contain_text(tile)
     tab(auth_page, "Программы")
-    main(auth_page).get_by_role("button", name="Новая программа").click()
+    screen_action(auth_page, "Новая программа").click()
     box = modal(auth_page, "Новая программа обучения")
     field(box, "Название").fill(title)
     field(box, "Провайдер").fill("QA Academy")
@@ -316,7 +316,7 @@ def test_training_program_type(auth_page: Page, dev):
     title = f"{QA_PREFIX} Курс тип {stamp()}"
     open_hrm(auth_page, "/admin/training")
     tab(auth_page, "Программы")
-    main(auth_page).get_by_role("button", name="Новая программа").click()
+    screen_action(auth_page, "Новая программа").click()
     box = modal(auth_page, "Новая программа обучения")
     field(box, "Название").fill(title)
     dropdown(auth_page, box, "Тип", "Внешнее")
