@@ -25,6 +25,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from helpers.crm import CRM, QA_PREFIX, crm_delete, crm_get, crm_post, open_crm, plugins_on, sidebar
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -116,7 +117,7 @@ def send_reply(page: Page, dialog_id: int, text: str):
 def test_menu_items(chat: Page):
     menu = sidebar(chat)
     # с 08.11 в пункте счётчик непрочитанных: «Входящие 30»
-    expect(menu.get_by_role("link", name=re.compile(r"^Входящие(\s*\d+)?$"))).to_be_visible()
+    expect(menu.get_by_role("link", name=re.compile(r"^Входящие(\s*\d+\+?)?$"))).to_be_visible()
     expect(menu.get_by_role("link", name="Все переписки", exact=True)).to_be_visible()
 
 
@@ -210,14 +211,14 @@ def test_close_and_reopen(chat: Page, channel: dict):
     expect(composer(chat)).to_be_visible(timeout=20_000)
 
     with chat.expect_response(lambda r: f"/conversations/{sent['dialog_id']}/close" in r.url) as resp:
-        chat.locator("main").get_by_role("button", name="Закрыть", exact=True).first.click()
+        screen_button(chat, "Закрыть", exact=True).first.click()
     assert resp.value.ok, resp.value.text()
     expect(chat.get_by_text("Диалог закрыт. Откройте заново")).to_be_visible()
     expect(composer(chat)).to_have_count(0)
     assert conversation(chat, sent["dialog_id"])["status"] == "closed"
 
     with chat.expect_response(lambda r: f"/conversations/{sent['dialog_id']}/reopen" in r.url) as resp:
-        chat.locator("main").get_by_role("button", name="Открыть", exact=True).click()
+        screen_button(chat, "Открыть", exact=True).click()
     assert resp.value.ok, resp.value.text()
     expect(composer(chat)).to_be_visible()
     assert conversation(chat, sent["dialog_id"])["status"] == "open"
@@ -231,7 +232,7 @@ def test_archive_dialog(chat: Page, channel: dict):
     open_dialog(chat, sent["dialog_id"])
 
     with chat.expect_response(lambda r: f"/conversations/{sent['dialog_id']}/archive" in r.url) as resp:
-        chat.locator("main").get_by_role("button", name="В архив").click()
+        screen_button(chat, "В архив").click()
     assert resp.value.ok, resp.value.text()
 
     assert conversation(chat, sent["dialog_id"])["status"] == "archived"

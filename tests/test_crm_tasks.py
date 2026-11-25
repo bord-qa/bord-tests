@@ -435,7 +435,9 @@ def test_mine_and_all(tasks: Page):
     expect(tasks.get_by_title("Включено «Мои» — показаны только ваши задачи")).to_be_visible()
     cards = tasks.locator("main [draggable=true]")
     expect(cards.first).to_be_visible()
-    for owner in cards.locator("span.truncate").all_inner_texts():
+    # с ~20.11 у карточки со сделкой — плашка этапа (span.truncate в [title^="Этап сделки:"]); ответственный — первый span
+    for card in cards.all():
+        owner = card.locator("span.truncate").first.inner_text()
         assert owner == me_name(tasks), f"в «Мои» чужая задача: {owner}"
 
     with tasks.expect_response(lambda r: "/tasks/due-board" in r.url) as resp:

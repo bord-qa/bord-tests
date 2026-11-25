@@ -32,6 +32,7 @@ from playwright.sync_api import Page, expect
 
 from helpers.crm import (CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put,
                          open_crm, plugins_on)
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -292,7 +293,7 @@ def test_category_saved_and_filtered(companies: Page):
     companies.goto(CRM + PAGE)
     expect(row(companies, target["name"])).to_have_count(1)
     with companies.expect_response(lambda r: "/api/crm/companies/" in r.url and f"category={category}" in r.url):
-        companies.locator("main").get_by_role("button", name="Категория").click()
+        screen_button(companies, "Категория").click()
         pick(companies, "Партнёры")
 
     expect(row(companies, target["name"])).to_have_count(1)
@@ -485,7 +486,7 @@ def test_archive_and_restore(companies: Page):
     expect(row(companies, c["name"])).to_have_count(0)
     assert crm_get(companies, f"/companies/{c['id']}").json()["is_active"] is False
 
-    companies.locator("main").get_by_role("button", name="Архив", exact=True).click()
+    screen_button(companies, "Архив", exact=True).click()
     # архив копит компании тестов (удалить нельзя), страница — 25 по алфавиту: своя ищется поиском,
     # иначе со случайным именем ближе к концу алфавита она уезжает на вторую страницу
     with companies.expect_response(lambda r: "/api/crm/companies/" in r.url and "search=" in r.url
@@ -503,7 +504,7 @@ def test_archive_and_restore(companies: Page):
     expect(archived).to_have_count(0)
     assert crm_get(companies, f"/companies/{c['id']}").json()["is_active"] is True
 
-    companies.locator("main").get_by_role("button", name="Активные", exact=True).click()
+    screen_button(companies, "Активные", exact=True).click()
     expect(row(companies, c["name"])).to_have_count(1)
 
 

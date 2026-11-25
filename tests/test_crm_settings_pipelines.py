@@ -41,6 +41,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from helpers.crm import CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_ready, open_crm
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -194,7 +195,7 @@ def test_pipelines_match_api(settings: Page):
 def test_create_pipeline_via_form(settings: Page):
     before = len(pipelines(settings))
     name = title()
-    settings.locator("main").get_by_role("button", name="Создать воронку").click()
+    screen_button(settings, "Создать воронку").click()
     form = overlay(settings, "Новая воронка")
     form.get_by_placeholder("Название воронки").fill(name)
     with settings.expect_response(api("/pipeline-statuses/pipelines", "POST")) as created:
@@ -386,7 +387,7 @@ def test_source_lifecycle(settings: Page):
     expect(sources_counter(settings, active, hidden)).to_be_visible()
 
     name = title()
-    settings.locator("main").get_by_role("button", name="Добавить", exact=True).click()
+    screen_button(settings, "Добавить", exact=True).click()
     form = overlay(settings, "Новый источник")
     form.get_by_placeholder("Название источника").fill(name)
     with settings.expect_response(api("/api/crm/sources/", "POST")) as created:
@@ -446,19 +447,19 @@ def choose_type(page: Page, scope, current: str, new: str):
 def test_loss_reason_create(settings: Page):
     open_tab(settings, "loss_reasons")
     main = settings.locator("main")
-    expect(main.get_by_role("button", name="Добавить", exact=True)).to_be_disabled()
+    expect(screen_button(settings, "Добавить", exact=True)).to_be_disabled()
 
     name = title()
-    main.get_by_placeholder("Например: Ребёнок или спам").fill(name)
+    screen_field(settings, "Например: Ребёнок или спам").fill(name)
     choose_type(settings, main, "Лиды", "Сделки")
     with settings.expect_response(api("/api/crm/loss-reasons/", "POST")) as created:
-        main.get_by_role("button", name="Добавить", exact=True).click()
+        screen_button(settings, "Добавить", exact=True).click()
 
     assert created.value.status == 201, created.value.text()
     saved = created.value.json()
     assert (saved["name"], saved["applies_to"]) == (name, "deal"), saved
     expect(reason_row(settings, name)).to_contain_text("Сделки")
-    expect(main.get_by_placeholder("Например: Ребёнок или спам")).to_have_value("")
+    expect(screen_field(settings, "Например: Ребёнок или спам")).to_have_value("")
 
 
 # Кейс: Правка причины в строке — новое название и тип «Лиды и сделки»
@@ -548,7 +549,7 @@ def test_client_state_create(settings: Page):
     expect(settings.locator("main").get_by_text(f"Жизненные состояния клиента ({before})")).to_be_visible()
 
     name = title()
-    settings.locator("main").get_by_role("button", name="Добавить состояние").click()
+    screen_button(settings, "Добавить состояние").click()
     form = overlay(settings, "Новое состояние")
     form.get_by_placeholder("Например: Холодный").fill(name)
     form.get_by_placeholder("Краткое описание состояния").fill("Описание от автотеста")

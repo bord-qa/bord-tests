@@ -36,6 +36,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from helpers.crm import CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put, open_crm
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -147,7 +148,7 @@ def open_reports(page: Page, tab: str = "overview"):
 
 
 def tab_button(page: Page, name: str):
-    return page.locator("main").get_by_role("button", name=name, exact=True)
+    return screen_button(page, name, exact=True)
 
 
 def choose_period(page: Page, button: str, date_from: dt.date, date_to: dt.date):
@@ -425,10 +426,10 @@ def test_time_report_period_and_search(reports: Page):
     today = browser_today(reports)
     main = reports.locator("main")
 
-    main.get_by_role("button", name="Сегодня", exact=True).click()
+    screen_button(reports, "Сегодня", exact=True).click()
     expect(reports).to_have_url(re.compile(rf"from={today.isoformat()}&to={today.isoformat()}"))
     with reports.expect_response(lambda r: "/api/crm/time-report/" in r.url and "q=" in r.url):
-        main.get_by_placeholder("Задача, заметка…").fill(note)
+        screen_field(reports, "Задача, заметка…").fill(note)
     rows = main.locator("table tbody tr")
     expect(rows).to_have_count(1)
     expect(rows.first).to_contain_text(task["title"])

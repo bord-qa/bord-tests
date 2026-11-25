@@ -31,6 +31,7 @@ from playwright.sync_api import Page, expect
 
 from helpers.crm import (CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put, crm_ready,
                          open_crm, plugins_on)
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -132,7 +133,7 @@ def project_saved(page: Page, project: dict):
 
 
 def stage_form(page: Page):
-    page.locator("main").get_by_role("button", name="Этап", exact=True).click()
+    screen_button(page, "Этап", exact=True).click()
     form = window(page, "Новый этап")
     expect(form).to_be_visible()
     return form
@@ -253,7 +254,7 @@ def test_add_task_to_project(projects: Page):
     open_project(projects, project)
     title = f"{QA_PREFIX} {tag()}"
 
-    projects.locator("main").get_by_role("button", name="Задача", exact=True).click()
+    screen_button(projects, "Задача", exact=True).click()
     form = window(projects, "Новая задача")
     expect(form.get_by_role("button", name=project["name"])).to_be_visible()
     form.get_by_placeholder(re.compile("^Необязательно")).fill(title)
@@ -353,15 +354,15 @@ def test_payment_flow(projects: Page):
     open_project(projects, project, "payments")
     main = projects.locator("main")
 
-    main.get_by_role("button", name="Этап оплаты").click()
-    main.get_by_placeholder("Аванс 30 %").fill("QA аванс")
-    main.get_by_placeholder("15000.00").fill("1000")
+    screen_button(projects, "Этап оплаты").click()
+    screen_field(projects, "Аванс 30 %").fill("QA аванс")
+    screen_field(projects, "15000.00").fill("1000")
     # срок — в будущем: этап с прошедшим сроком показывается просроченным, а не «Не оплачен»
     # (до 18.11 тут была зашита дата 2026-11-15)
     main.locator("input[type=date]").fill((dt.date.today() + dt.timedelta(days=30)).isoformat())
     with projects.expect_response(lambda r: f"/projects/{project['id']}/payments" in r.url
                                   and r.request.method == "POST") as resp:
-        main.get_by_role("button", name="Добавить", exact=True).click()
+        screen_button(projects, "Добавить", exact=True).click()
     assert resp.value.status == 201, resp.value.text()
     payment = resp.value.json()
 
@@ -382,7 +383,7 @@ def test_info_blocks(projects: Page):
     project = create_project(projects)
     open_project(projects, project)
 
-    projects.locator("main").get_by_role("button", name="Информация по проекту").click()
+    screen_button(projects, "Информация по проекту").click()
 
     blocks = crm_get(projects, f"/projects/{project['id']}/info").json()["blocks"]
     assert blocks

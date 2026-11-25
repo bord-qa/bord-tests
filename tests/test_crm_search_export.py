@@ -29,6 +29,7 @@ from playwright.sync_api import Page, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from helpers.crm import CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put, open_crm
+from helpers.ui import screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -249,7 +250,7 @@ def test_export_contacts_csv_with_search(crm: Page):
     assert crm_post(crm, "/bulk/contacts/delete", {"contact_ids": [archived["id"]]}).ok
     open_crm(crm, "/admin/crm/contacts")
     with crm.expect_response(lambda r: "/api/crm/contacts" in r.url and word in r.url):
-        crm.locator("main").get_by_placeholder("Имя, email, телефон…").fill(word)
+        screen_field(crm, "Имя, email, телефон…").fill(word)
 
     name, rows, url = export_csv(crm, "/api/crm/export/contacts")
     assert name == "contacts.csv" and f"search={word}" in url, (name, url)

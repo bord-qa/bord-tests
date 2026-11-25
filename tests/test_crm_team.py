@@ -37,6 +37,7 @@ from playwright.sync_api import Page, expect
 
 from helpers.auth import load_user
 from helpers.crm import QA_PREFIX, crm_delete, crm_get, crm_put, open_crm
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -85,7 +86,7 @@ def team(auth_page: Page):
 
 def open_team(page: Page, tab: str = "Сотрудники"):
     open_crm(page, PAGE)
-    page.locator("main").get_by_role("button", name=tab, exact=True).click()
+    screen_button(page, tab, exact=True).click()
 
 
 def pick(page: Page, option: str, first: bool = False):
@@ -183,7 +184,7 @@ def test_colleague_role_change_and_back(team: Page):
 def test_invite_needs_email(team: Page):
     open_team(team)
     main = team.locator("main")
-    email, invite = main.get_by_placeholder("почта@компания.md"), main.get_by_role("button", name="Пригласить", exact=True)
+    email, invite = screen_field(team, "почта@компания.md"), screen_button(team, "Пригласить", exact=True)
 
     expect(main).to_contain_text("Ссылка действует неделю и срабатывает один раз.")
     expect(invite).to_be_disabled()
@@ -223,7 +224,7 @@ def test_roles_tab_matches_api(team: Page):
     supers = sum(m["role"] == "superuser" for m in members(team))
     # число согласуется: «1 суперпользователь», «2 суперпользователя»
     expect(main).to_contain_text(re.compile(rf"в организации есть {supers} суперпользовател(ь|я|ей)[^а-я]"))
-    expect(main.get_by_role("button", name="Показать роли других продуктов")).to_contain_text(f"({hidden})")
+    expect(screen_button(team, "Показать роли других продуктов")).to_contain_text(f"({hidden})")
     for role in shown:
         card = role_card(team, role["name"]).filter(has_text=str(role["members"]))
         expect(card.first).to_be_visible()
@@ -240,7 +241,7 @@ def test_roles_tab_matches_api(team: Page):
 def test_create_role_needs_name(team: Page):
     open_team(team, "Роли и права")
     main = team.locator("main")
-    name, create = main.get_by_placeholder("Название новой роли — «Агент», «Оценщик»"), main.get_by_role(
+    name, create = screen_field(team, "Название новой роли — «Агент», «Оценщик»"), main.get_by_role(
         "button", name="Создать роль", exact=True)
 
     expect(create).to_be_disabled()
@@ -256,9 +257,9 @@ def test_custom_role_lifecycle(team: Page):
     open_team(team, "Роли и права")
     main = team.locator("main")
 
-    main.get_by_placeholder("Название новой роли — «Агент», «Оценщик»").fill(name)
+    screen_field(team, "Название новой роли — «Агент», «Оценщик»").fill(name)
     with team.expect_response(lambda r: r.url.endswith("/api/crm/roles/") and r.request.method == "POST") as resp:
-        main.get_by_role("button", name="Создать роль", exact=True).click()
+        screen_button(team, "Создать роль", exact=True).click()
     assert resp.value.status == 201, resp.value.text()
     role = resp.value.json()
     assert (role["name"], role["kind"], role["permissions"], role["members"]) == (name, "custom", ["crm.view"], 0), role

@@ -38,6 +38,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from helpers.crm import CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put, open_crm
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -192,7 +193,7 @@ def stage_post(page: Page, process: dict):
 
 
 def new_stage_form(page: Page):
-    page.locator("main").get_by_role("button", name="Этап", exact=True).click()
+    screen_button(page, "Этап", exact=True).click()
     form = overlay(page, "Новый этап")
     expect(form.get_by_placeholder("Например: На проверке")).to_be_visible()
     return form
@@ -243,7 +244,7 @@ def test_create_without_name(processes: Page):
     processes.on("request", lambda r: r.url.endswith("/api/crm/processes/") and r.method == "POST" and sent.append(r))
     open_processes(processes)
 
-    processes.locator("main").get_by_role("button", name="Процесс", exact=True).click()
+    screen_button(processes, "Процесс", exact=True).click()
     form = overlay(processes, "Новый процесс")
     form.get_by_role("button", name="Сохранить", exact=True).click()
 
@@ -258,7 +259,7 @@ def test_create_process_via_form(processes: Page):
     name, about = f"{QA_PREFIX} {tag()}", f"{QA_PREFIX} для задач поддержки"
     open_processes(processes)
 
-    processes.locator("main").get_by_role("button", name="Процесс", exact=True).click()
+    screen_button(processes, "Процесс", exact=True).click()
     form = overlay(processes, "Новый процесс")
     expect(form).to_contain_text("Этапы у нового процесса задаются следующим шагом")
     form.get_by_placeholder("Например: Разработка").fill(name)

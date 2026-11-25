@@ -47,6 +47,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from helpers.crm import QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put, open_crm, until_loaded
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -162,7 +163,7 @@ def automations(auth_page: Page):
 
 def open_automations(page: Page):
     open_crm(page, PAGE)
-    expect(page.locator("main").get_by_role("button", name="Выключенные", exact=True)).to_be_visible()
+    expect(screen_button(page, "Выключенные", exact=True)).to_be_visible()
 
 
 def rule_card(page: Page, name: str):
@@ -352,7 +353,7 @@ def test_filters(automations: Page):
             if attempt[0]:
                 open_automations(automations)
             attempt[0] += 1
-            main.get_by_role("button", name=button, exact=True).click()
+            screen_button(automations, button, exact=True).click()
 
         attempt = [0]
         until_loaded(automations, action, lambda r: "/api/crm/auto-actions?" in r.url and param in r.url)

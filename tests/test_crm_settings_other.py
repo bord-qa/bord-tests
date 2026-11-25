@@ -51,6 +51,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from helpers.crm import (CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put, crm_ready, open_crm,
                          until_loaded)
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -216,7 +217,7 @@ def test_scripts_match_api(settings: Page):
 # Кейс: Новый скрипт через форму — без названия «Создать» неактивна; скрипт появляется в списке
 def test_create_script_via_form(settings: Page):
     open_tab(settings, "scripts")
-    settings.locator("main").get_by_role("button", name="Новый скрипт").click()
+    screen_button(settings, "Новый скрипт").click()
     settings.locator("main div.absolute button").filter(has_text="Создать пустой").click()
     form = overlay(settings, "Новый скрипт")
     create = form.get_by_role("button", name="Создать", exact=True)
@@ -349,8 +350,8 @@ def test_archive_and_restore_script(settings: Page):
     saved = next(s for s in scripts(settings) if s["id"] == script["id"])
     assert saved["is_active"] is False, saved
 
-    settings.locator("main").get_by_role("button", name="Только активные").click()
-    expect(settings.locator("main").get_by_role("button", name="Включая архив")).to_be_visible()
+    screen_button(settings, "Только активные").click()
+    expect(screen_button(settings, "Включая архив")).to_be_visible()
     expect(script_card(settings, script["name"])).to_contain_text("архив", ignore_case=True)
     script_menu(settings, script["name"]).get_by_role("button", name="Восстановить").click()
     # «Восстановить» без подтверждения
@@ -368,14 +369,18 @@ def open_fields(page: Page, entity: str = "contact"):
     def action():
         open_tab(page, "custom_fields")
         if entity != "contact":
-            page.locator("main").get_by_role("button", name=FIELD_TABS[entity], exact=True).click()
+            # «Сделки» / «Задачи» есть и среди вкладок настроек — переключатель сущности последний
+            page.locator("main").get_by_role("button", name=FIELD_TABS[entity], exact=True).last.click()
 
     until_loaded(page, action, lambda r: f"/custom-fields/?entity_type={entity}" in r.url)
 
 
-def field_row(page: Page, name: str):
-    return page.locator("main div").filter(has_text=name).filter(
-        has=page.get_by_role("button", name="Редактировать")).last
+def field_row(page: Page, name: str, field_id: int | None = None):
+    """Строка поля; одноимённые бывают (активная «Площадь» и архивная) — тогда по номеру «ID N»."""
+    row = page.locator("main div").filter(has_text=name).filter(has=page.get_by_role("button", name="Редактировать"))
+    if field_id is not None:
+        row = row.filter(has_text=re.compile(rf"ID {field_id}(?!\d)"))
+    return row.last
 
 
 def card_field(page: Page, name: str):
@@ -390,8 +395,10 @@ def test_fields_match_api(settings: Page, entity):
     open_fields(settings, entity)
 
     expected = [f for f in fields(settings, entity) if not f.get("is_archived")]
+    # список вкладки дорисовывается позже ответа API (редкий флак у «Сделок» / «Задач») — сначала ждём своё поле
+    expect(field_row(settings, mine["name"], mine["id"])).to_be_visible(timeout=15_000)
     for f in expected:
-        expect(field_row(settings, f["name"])).to_contain_text(f"ID {f['id']}")
+        expect(field_row(settings, f["name"], f["id"])).to_contain_text(f"ID {f['id']}")
     expect(field_row(settings, mine["name"])).to_contain_text("Текст")
     for other in set(FIELD_TABS) - {entity}:
         assert mine["id"] not in [f["id"] for f in fields(settings, other)]
@@ -400,7 +407,7 @@ def test_fields_match_api(settings: Page, entity):
 # Кейс: Поле-список через форму — «Создать» без названия неактивна; колонка в списке клиентов и значение в карточке
 def test_create_select_field_and_fill_in_card(settings: Page):
     open_fields(settings, "contact")
-    settings.locator("main").get_by_role("button", name="Поле", exact=True).click()
+    screen_button(settings, "Поле", exact=True).click()
     form = overlay(settings, "Новое поле")
     create = form.get_by_role("button", name="Создать", exact=True)
     expect(create).to_be_disabled()
@@ -607,7 +614,7 @@ def test_rates_next_page(settings: Page):
 def test_report_currency_eur(settings: Page):
     create_deal(settings, amount=777)
     open_tab(settings, "currency")
-    save = settings.locator("main").get_by_role("button", name="Сохранить")
+    save = screen_button(settings, "Сохранить")
     expect(save).to_be_disabled()
     settings.get_by_role("button", name="Валюта отчётов").click()
     floating(settings).get_by_role("button", name="EUR", exact=True).click()

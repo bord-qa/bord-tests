@@ -31,6 +31,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from helpers.crm import CRM, QA_PREFIX, crm_delete, crm_get, crm_me, crm_post, crm_put, open_crm
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -86,7 +87,7 @@ def monitoring(auth_page: Page):
 
 def open_monitoring(page: Page):
     open_crm(page, PAGE)
-    expect(page.locator("main").get_by_role("button", name="Все сущности", exact=True)).to_be_visible()
+    expect(screen_button(page, "Все сущности", exact=True)).to_be_visible()
 
 
 def rows(page: Page):
@@ -165,7 +166,7 @@ def test_actor_filter(monitoring: Page, label: str):
     open_monitoring(monitoring)
 
     with feed_request(monitoring, f"actor_type={ACTORS[label]}"):
-        monitoring.locator("main").get_by_role("button", name=label, exact=True).first.click()
+        screen_button(monitoring, label, exact=True).first.click()
     total = crm_get(monitoring, "/audit/feed", {"actor_type": ACTORS[label], "limit": 50}).json()["total"]
     if not total:
         expect(rows(monitoring)).to_have_count(0)
@@ -181,10 +182,10 @@ def test_own_event_only_under_manual(monitoring: Page):
     open_monitoring(monitoring)
 
     with feed_request(monitoring, "actor_type=manual"):
-        monitoring.locator("main").get_by_role("button", name="Руками", exact=True).first.click()
+        screen_button(monitoring, "Руками", exact=True).first.click()
     expect(entity_rows(monitoring, "Сделка", deal["id"])).to_have_count(1)
     with feed_request(monitoring, "actor_type=automation"):
-        monitoring.locator("main").get_by_role("button", name="Автоматизация", exact=True).first.click()
+        screen_button(monitoring, "Автоматизация", exact=True).first.click()
     expect(entity_rows(monitoring, "Сделка", deal["id"])).to_have_count(0)
 
 
@@ -194,7 +195,7 @@ def test_entity_filter(monitoring: Page, option: str):
     entity_type, label = ENTITIES[option]
     open_monitoring(monitoring)
 
-    monitoring.locator("main").get_by_role("button", name="Все сущности", exact=True).click()
+    screen_button(monitoring, "Все сущности", exact=True).click()
     with feed_request(monitoring, f"entity_type={entity_type}"):
         pick(monitoring, option)
     if not crm_get(monitoring, "/audit/feed", {"entity_type": entity_type, "limit": 1}).json()["total"]:
@@ -212,7 +213,7 @@ def test_action_filter(monitoring: Page, option: str):
     make_deal(monitoring)  # хотя бы одно «создан» сегодня
     open_monitoring(monitoring)
 
-    monitoring.locator("main").get_by_role("button", name="Все действия", exact=True).click()
+    screen_button(monitoring, "Все действия", exact=True).click()
     with feed_request(monitoring, f"action={action}"):
         pick(monitoring, option)
     if not crm_get(monitoring, "/audit/feed", {"action": action, "limit": 1}).json()["total"]:

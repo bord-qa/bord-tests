@@ -221,6 +221,12 @@ def reload_calendar(page: Page):
     raise AssertionError(f"календарь не загрузил слои за 3 попытки: есть только {sorted(seen)}")
 
 
+def bar(page: Page):
+    """Панель календаря: с ~20.11 кнопки «Создать», виды, «Сегодня», «Мои», слои, статусы и шапка периода
+    переехали в шапку экрана (видимый header), часть — в main."""
+    return page.locator("header:visible, main")
+
+
 def chip(page: Page, name: str):
     """Событие, задача или напоминание на сетке — по title (название или текст)."""
     return page.locator(f"main [role=button][title='{name}']")
@@ -239,7 +245,7 @@ def overlay(page: Page, text: str):
 def expect_period(page: Page, text: str):
     """Шапка периода («Ноябрь 2026», «26 октября – 1 ноября 2026»). Регистр сверяем без учёта:
     до 04.11 месяц был строчным в DOM и заглавным через CSS capitalize, теперь класса нет."""
-    period = page.locator("main div.font-semibold.whitespace-nowrap")
+    period = bar(page).locator("div.font-semibold.whitespace-nowrap").first
     expect(period).to_have_text(re.compile(rf"^{re.escape(text)}$", re.IGNORECASE))
 
 
@@ -248,11 +254,11 @@ def month_title(day: dt.date) -> str:
 
 
 def view_button(page: Page, name: str):
-    return page.locator("main").get_by_role("button", name=name, exact=True)
+    return bar(page).get_by_role("button", name=name, exact=True).first
 
 
 def create_menu(page: Page, item: str):
-    page.locator("main").get_by_role("button", name="Создать", exact=True).click()
+    bar(page).get_by_role("button", name="Создать", exact=True).first.click()
     page.get_by_role("button", name=item, exact=True).click()
 
 
@@ -463,7 +469,7 @@ def test_navigation(calendar: Page):
     reload_calendar(calendar)
     expect(chip(calendar, event["title"])).to_have_count(0)
 
-    today_button = calendar.locator("main").get_by_role("button", name="Сегодня", exact=True)
+    today_button = bar(calendar).get_by_role("button", name="Сегодня", exact=True).first
     today_button.locator("xpath=following-sibling::button[1]").click()
     expect_period(calendar, month_title(next_month))
     expect(day_number(chip(calendar, event["title"]))).to_have_text("15")
@@ -491,13 +497,13 @@ def test_task_opens_card(calendar: Page):
 def test_task_status_filter(calendar: Page):
     task = create_task(calendar, free_day(calendar), global_status="done")
     reload_calendar(calendar)
-    statuses = calendar.locator("main").get_by_title("Какие задачи показывать по статусу")
+    statuses = bar(calendar).get_by_title("Какие задачи показывать по статусу").first
     expect(statuses).to_contain_text("4/5")
     expect(chip(calendar, task["title"])).to_have_count(0)
 
     statuses.click()
     with prefs_saved(calendar):
-        calendar.locator("main").get_by_role("button", name="Завершена", exact=True).click()
+        calendar.get_by_role("button", name="Завершена", exact=True).first.click()
     expect(statuses).to_contain_text("5/5")
     expect(chip(calendar, task["title"])).to_have_count(1)
     assert "done" in prefs(calendar)["task_statuses"]

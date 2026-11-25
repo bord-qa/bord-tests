@@ -63,7 +63,10 @@ def test_crm_menu(auth_page: Page):
     links = sidebar(auth_page).locator("nav a")
     # с 08.11 «Входящие» — первый пункт ядра, со счётчиком непрочитанных («Входящие36»);
     # плагин «Проекты», если он включён в BORD QA, добавляет «Проекты» и «Нагрузка»
-    menu = [re.compile(r"^Входящие\d*$")] + MENU
+    menu = [re.compile(r"^Входящие[\d+]*$")] + MENU  # счётчик до «99+»
+    # с ~20.11 «Свободные задачи» — пункт ядра сразу после «Задач»; у «Задач» счётчики («Задачи34»)
+    at = menu.index("Задачи")
+    menu[at:at + 1] = [re.compile(r"^Задачи[\d+]*$"), "Свободные задачи"]
     plugins = {p["plugin_key"]: p["is_enabled"] for p in crm_get(auth_page, "/plugins/").json()}
     # с 10.11 так же плагин «Объекты» (включён в BORD QA) — «Объекты» и «Подбор» сразу после «Календаря»
     at = menu.index("Календарь") + 1
@@ -71,6 +74,14 @@ def test_crm_menu(auth_page: Page):
         menu[at:at] = ["Проекты", "Нагрузка"]
     if plugins.get("objects"):
         menu[at:at] = ["Объекты", "Подбор"]
+    # плагины, которые в BORD QA включают и другие (25.11 включены): «Лиды» после «Входящих»,
+    # «Магазин» (каталог ECOM) после «Сделок», «Чат-бот» после «Автоматизаций»
+    if plugins.get("chat_bot"):
+        menu.insert(menu.index("Автоматизации") + 1, "Чат-бот")
+    if plugins.get("ecom_catalog"):
+        menu.insert(menu.index("Сделки") + 1, "Магазин")
+    if plugins.get("leads"):
+        menu.insert(1, "Лиды")
     expect(links).to_have_text(menu)
     expect(sidebar(auth_page).get_by_role("link", name="Документация")).to_have_attribute(
         "href", "https://help.bord.one/crm/")
@@ -104,7 +115,7 @@ def test_crm_menu_navigation(auth_page: Page):
     sidebar(auth_page).get_by_role("link", name="Клиенты", exact=True).click()
     expect(auth_page).to_have_url(CRM + "/admin/crm/contacts")
     expect(auth_page).to_have_title("Клиенты · BORD CRM")
-    sidebar(auth_page).get_by_role("link", name="Задачи", exact=True).click()
+    sidebar(auth_page).locator('nav a[href="/admin/crm/tasks"]').click()  # в имени ссылки счётчики и «Мои»
     expect(auth_page).to_have_url(CRM + "/admin/crm/tasks")
 
 

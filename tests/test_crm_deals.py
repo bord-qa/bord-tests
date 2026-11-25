@@ -155,7 +155,9 @@ def test_board_matches_api(deals: Page):
         assert money(head.inner_text().split("\n")[-1]) == pytest.approx(col["total_amount"]), \
             f"«{stage}»: сумма на доске {head.inner_text()!r}, в API {col['total_amount']}"
         for d in col["deals"]:
-            expect(deal_link(deals, d["title"])).to_be_visible()
+            # одноимённые сделки бывают (веб-чат: три «Заявка из чата — Посетитель сайта») — ищем по id
+            link = deals.locator(f'main a[href="/admin/crm/deals?id={d["id"]}"]')
+            expect(link, d["title"]).to_have_text(d["title"])
 
 
 # Кейс: «Создать» неактивна без названия сделки
