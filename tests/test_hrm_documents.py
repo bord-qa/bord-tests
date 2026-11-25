@@ -28,7 +28,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
+from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, dropdown, field,
                          hrm_delete, hrm_get, hrm_json, hrm_post, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -39,7 +39,7 @@ def main(page: Page):
 
 
 def tab(page: Page, name: str):
-    main(page).get_by_role("button", name=name, exact=True).click()
+    screen_tab(page, name).click()
 
 
 def modal(page: Page, heading: str):

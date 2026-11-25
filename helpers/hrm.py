@@ -173,6 +173,21 @@ def header_button(page: Page, name: str):
     return page.locator("header button:visible").filter(has_text=re.compile(rf"^\s*{re.escape(name)}\s*$")).first
 
 
+def screen_tab(page: Page, name: str):
+    """Вкладка экрана («Нарушения», «Типы нарушений», «Политики»…). До ~20.11.2026 вкладки стояли
+    в теле экрана, теперь — в шапке рядом с заголовком (у «Настроек» остались в теле). Ищем в видимой
+    шапке, потом в main — точное совпадение подписи."""
+    exact = re.compile(rf"^\s*{re.escape(name)}\s*$")
+    return page.locator("header button:visible").filter(has_text=exact).or_(
+        page.locator("main").get_by_role("button", name=name, exact=True)).first
+
+
+def screen_action(page: Page, name: str):
+    """Кнопка действия экрана («Создать грейд», «Добавить запись», «Создать льготу»…). С ~20.11.2026
+    уехала из тела экрана в шапку вместе с вкладками — ищем так же, как screen_tab."""
+    return screen_tab(page, name)
+
+
 def date_field(box, label: str):
     """Поле даты: после подписи — span с input[type=date] внутри (или сам input)."""
     return box.locator(f"xpath=.//label[normalize-space(.)='{label}']/following-sibling::*[1]"

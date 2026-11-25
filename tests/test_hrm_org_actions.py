@@ -34,7 +34,7 @@ import openpyxl
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, hrm_delete, hrm_get, hrm_json,
+from helpers.hrm import (screen_tab, QA_PREFIX, clean_up, create_employee, create_legal_entity, delete_employee, hrm_delete, hrm_get, hrm_json,
                          hrm_post, hrm_put, items, open_hrm, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -47,7 +47,7 @@ def main(page: Page):
 
 
 def tab(page: Page, name: str):
-    main(page).get_by_role("button", name=name, exact=True).click()
+    screen_tab(page, name).click()
 
 
 def dialog(page: Page, text: str):

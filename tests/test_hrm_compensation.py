@@ -36,7 +36,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.hrm import (QA_PREFIX, RAISE_MANAGER, pick_raise_manager, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
+from helpers.hrm import (screen_tab, screen_action, QA_PREFIX, RAISE_MANAGER, pick_raise_manager, clean_up, create_employee, create_legal_entity, date_field, delete_employee,
                          dropdown, field, header_button, hrm_delete, hrm_get, hrm_json, hrm_patch, hrm_post, items,
                          open_hrm, screen_title, stamp)
 
@@ -50,7 +50,7 @@ def main(page: Page):
 
 
 def tab(page: Page, name: str):
-    main(page).get_by_role("button", name=name, exact=True).click()
+    screen_tab(page, name).click()
 
 
 def modal(page: Page, heading: str):
@@ -108,7 +108,7 @@ def test_band_form(auth_page: Page, comp):
     auth_page.on("request", lambda r: posts.append(r.url) if "/compensation/bands" in r.url and r.method == "POST" else None)
     open_hrm(auth_page, "/admin/compensation")
     expect(screen_title(auth_page)).to_have_attribute("title", "Компенсация")
-    main(auth_page).get_by_role("button", name="Создать грейд").click()
+    screen_action(auth_page, "Создать грейд").click()
     box = modal(auth_page, "Создать грейд")
     field(box, "Название").fill(name)
     field(box, "Уровень (число)").fill("2")
@@ -164,7 +164,7 @@ def test_salary_record(auth_page: Page, person):
                                                                 "min_salary": 10000, "max_salary": 20000, "currency": "MDL"}))
     open_hrm(auth_page, "/admin/compensation")
     tab(auth_page, "Записи")
-    main(auth_page).get_by_role("button", name="Добавить запись").click()
+    screen_action(auth_page, "Добавить запись").click()
     box = modal(auth_page, "Добавить запись")
     dropdown(auth_page, box, "Сотрудник", emp["telegram_first_name"])
     expect(field(box, "Место работы (юрлицо)")).to_contain_text(f"Основное место работы — {le['name']}")
@@ -230,7 +230,7 @@ def test_benefit_enrollment(auth_page: Page, person):
     name = f"{QA_PREFIX} Льгота {stamp()}"
     open_hrm(auth_page, "/admin/compensation")
     tab(auth_page, "Льготы")
-    main(auth_page).get_by_role("button", name="Создать льготу").click()
+    screen_action(auth_page, "Создать льготу").click()
     box = auth_page.locator("div.fixed.inset-0:visible").filter(has=auth_page.get_by_role("button", name="Сохранить")).last
     field(box, "Название").fill(name)
     field(box, "Описание").fill("QA: медицинская страховка")
@@ -244,7 +244,7 @@ def test_benefit_enrollment(auth_page: Page, person):
     expect(card).to_contain_text("0 подписок")
 
     tab(auth_page, "Подписки")
-    main(auth_page).get_by_role("button", name="Записать сотрудника").click()
+    screen_action(auth_page, "Записать сотрудника").click()
     box = modal(auth_page, "Записать сотрудника на льготу")
     dropdown(auth_page, box, "Сотрудник", emp["telegram_first_name"])
     dropdown(auth_page, box, "Льгота", name)
