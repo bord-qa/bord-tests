@@ -46,6 +46,7 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_delete, api_get, api_patch, api_post
 from helpers.modal import modal
 from helpers.wait import settle
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -100,7 +101,7 @@ def cleanup(page: Page):
 @pytest.fixture
 def incidents(auth_page: Page):
     auth_page.goto("/admin/security/incidents")
-    expect(auth_page.locator("main").get_by_role("button", name="Новый инцидент")).to_be_visible()
+    expect(screen_button(auth_page, "Новый инцидент")).to_be_visible()
     settle(auth_page)
     yield auth_page
     cleanup(auth_page)
@@ -115,7 +116,7 @@ def open_card(page: Page, item: dict):
 def delete_incident_button(page: Page):
     """«Удалить» самого инцидента — текстовая кнопка; с 02.11 у строк хронологии и задач
     по итогам есть свои иконки с aria-label «Удалить»."""
-    return page.locator("main").get_by_role("button", name="Удалить", exact=True).filter(has_text="Удалить")
+    return screen_button(page, "Удалить", exact=True).filter(has_text="Удалить")
 
 
 def section(page: Page, heading: str, button: str):
@@ -157,7 +158,7 @@ def test_counters_match_summary(incidents: Page):
 def test_create_incident_via_form(incidents: Page):
     name = title()
     before = summary(incidents)
-    incidents.locator("main").get_by_role("button", name="Новый инцидент").click()
+    screen_button(incidents, "Новый инцидент").click()
     form = modal(incidents, "Новый инцидент")
     form.get_by_role("button", name="Сохранить").click()
     expect(form.get_by_text("Нужно название", exact=True)).to_be_visible()
@@ -197,7 +198,7 @@ def test_create_incident_via_form(incidents: Page):
 @pytest.mark.writes_data
 def test_secret_in_text_rejected(incidents: Page):
     name = title()
-    incidents.locator("main").get_by_role("button", name="Новый инцидент").click()
+    screen_button(incidents, "Новый инцидент").click()
     form = modal(incidents, "Новый инцидент")
     field(form, "Название").fill(name)
     field(form, "Что случилось").fill("пароль: Qwerty123!")
@@ -253,7 +254,7 @@ def test_close_blocked_until_actions_done(incidents: Page):
     expect(timeline).to_contain_text("Статус: Открыт → Локализован")
     expect(timeline).to_contain_text("Статус: Локализован → Закрыт")
     incidents.reload()
-    expect(incidents.locator("main").get_by_role("button", name="Изменить")).to_be_visible()
+    expect(screen_button(incidents, "Изменить")).to_be_visible()
     expect(delete_incident_button(incidents)).to_have_count(0)
 
 
@@ -292,7 +293,7 @@ def test_timeline_event(incidents: Page):
 def test_evidence_sha_checked_and_saved(incidents: Page):
     item = create_incident(incidents)
     open_card(incidents, item)
-    incidents.locator("main").get_by_role("button", name="Улика").click()
+    screen_button(incidents, "Улика").click()
     form = modal(incidents, "Улика")
     field(form, "Имя файла").fill("qa-logs.7z")
     field(form, "SHA-256").fill("abc")
@@ -322,7 +323,7 @@ def test_edit_incident(incidents: Page):
     open_card(incidents, item)
     new_title = f"{item['title']} изм."
 
-    incidents.locator("main").get_by_role("button", name="Изменить", exact=True).click()
+    screen_button(incidents, "Изменить", exact=True).click()
     form = modal(incidents, "Изменить инцидент")
     expect(field(form, "Название")).to_have_value(item["title"])
     expect(field(form, "Что случилось")).to_have_value("было")
@@ -351,7 +352,7 @@ def import_file(tmp_path, name: str, body) -> str:
 
 
 def open_import(page: Page):
-    page.locator("main").get_by_role("button", name="Импорт архива").click()
+    screen_button(page, "Импорт архива").click()
     return modal(page, "Импорт архива инцидентов")
 
 
@@ -472,7 +473,7 @@ def test_list_filters_and_search(incidents: Page):
     expect(rows(out["title"])).to_have_count(0)
     pick(incidents, main, "SEV1 — критический", "Любая тяжесть")
 
-    main.get_by_placeholder("Номер, название, клиент…").fill(out["title"])
+    screen_field(incidents, "Номер, название, клиент…").fill(out["title"])
     expect(rows(out["title"])).to_have_count(1)
     expect(rows(sec["title"])).to_have_count(0)
 
@@ -486,4 +487,4 @@ def test_vault_only_for_custodians(incidents: Page):
 
     main = incidents.locator("main")
     expect(main.get_by_text("Хранилище улик открыто только хранителям")).to_be_visible()
-    expect(main.get_by_role("button", name="Стать хранителем")).to_be_visible()
+    expect(screen_button(incidents, "Стать хранителем")).to_be_visible()

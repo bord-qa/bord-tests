@@ -118,11 +118,17 @@ def label(title: str) -> re.Pattern:
     return re.compile(rf"^{re.escape(title)}\s*\d*$")
 
 
+def solo(section: dict, item: dict) -> bool:
+    """Пункт без группы или единственный в своей группе — с ~20.11 такая группа рисуется сразу ссылкой на пункт
+    (раздел «Продажи»: группа «Маркетинг» из одного «Чат-бот» → ссылка «Чат-бот»)."""
+    return item["group"] is None or sum(i["group"] == item["group"] for i in section["items"]) == 1
+
+
 def expected_subnav(section: dict) -> list[tuple[str, str]]:
-    """Пункты без группы — ссылки, группа — одна кнопка на месте своего первого пункта."""
+    """Пункты без группы (и одиночки группы) — ссылки, группа — одна кнопка на месте своего первого пункта."""
     out, seen = [], set()
     for item in section["items"]:
-        if item["group"] is None:
+        if solo(section, item):
             out.append(("a", item["title"]))
         elif item["group"] not in seen:
             seen.add(item["group"])
@@ -173,7 +179,7 @@ def test_section_opens_first_item_and_subnav(one: Page):
         for (tag, title), el in zip(want, sub_items(one).all()):
             assert el.evaluate("e => e.tagName.toLowerCase()") == tag, f"{section['key']}/{title}: ждали <{tag}>"
             if tag == "a":
-                item = next(i for i in section["items"] if i["title"] == title and i["group"] is None)
+                item = next(i for i in section["items"] if i["title"] == title and solo(section, i))
                 expect(el).to_have_attribute("href", one_url(item).removeprefix("https://app.bord.one"))
         expect(subnav(one).get_by_role("link", name="Настроить меню")).to_have_attribute(
             "href", "/admin/one/hub/settings/menu")
@@ -184,7 +190,7 @@ def test_group_menus_match_api(one: Page):
     open_one(one)
     clicked = None
     for section in shell(one)["sections"]:
-        groups = [g for _, g in expected_subnav(section) if any(i["group"] == g for i in section["items"])]
+        groups = [g for tag, g in expected_subnav(section) if tag == "button"]
         if not groups:
             continue
         top_nav(one).get_by_role("button", name=label(section["title"])).click()

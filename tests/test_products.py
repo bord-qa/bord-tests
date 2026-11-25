@@ -29,6 +29,7 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_get, api_post
 from helpers.modal import close_modal, modal
 from helpers.wait import settle
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -59,7 +60,7 @@ def archive_qa_products(page: Page):
 @pytest.fixture
 def products(auth_page: Page):
     auth_page.goto("/admin/products")
-    expect(auth_page.locator("main").get_by_role("button", name="Добавить продукт").first).to_be_visible()
+    expect(screen_button(auth_page, "Добавить продукт").first).to_be_visible()
     settle(auth_page)
     yield auth_page
     archive_qa_products(auth_page)
@@ -71,11 +72,11 @@ def rows(page: Page):
 
 def find(page: Page, text: str):
     with page.expect_response(lambda r: r.url.split("?")[0].endswith(API) and "q=" in r.url):
-        page.locator("main").get_by_placeholder("Название или код").fill(text)
+        screen_field(page, "Название или код").fill(text)
 
 
 def open_new(page: Page):
-    page.locator("main").get_by_role("button", name="Добавить продукт").first.click()
+    screen_button(page, "Добавить продукт").first.click()
     return modal(page, "Новый продукт")
 
 
@@ -254,7 +255,7 @@ def test_archive_and_restore(products: Page):
     close_modal(products, product["name"])
     expect(rows(products).filter(has_text=product["name"])).to_have_count(0)
 
-    main.get_by_role("button", name="Архив", exact=True).click()
+    screen_button(products, "Архив", exact=True).click()
     row = rows(products).filter(has_text=product["name"])
     expect(row).to_have_count(1)
     row.click()
@@ -264,7 +265,7 @@ def test_archive_and_restore(products: Page):
     assert restored.value.ok
     assert api_get(products, f"{API}{product['id']}").json()["archived"] is False
     close_modal(products, product["name"])
-    main.get_by_role("button", name="Действующие").click()
+    screen_button(products, "Действующие").click()
     expect(rows(products).filter(has_text=product["name"])).to_have_count(1)
 
 

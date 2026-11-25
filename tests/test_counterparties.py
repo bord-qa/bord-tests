@@ -38,6 +38,7 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_get, api_post
 from helpers.modal import close_modal, modal
 from helpers.wait import settle
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -68,14 +69,14 @@ def archive_qa_cards(page: Page):
 @pytest.fixture
 def cp(auth_page: Page):
     auth_page.goto("/admin/counterparties")
-    expect(auth_page.locator("main").get_by_role("button", name="Добавить контрагента").first).to_be_visible()
+    expect(screen_button(auth_page, "Добавить контрагента").first).to_be_visible()
     settle(auth_page)
     yield auth_page
     archive_qa_cards(auth_page)
 
 
 def search(page: Page):
-    return page.locator("main").get_by_placeholder("Название, юр. название или IDNO")
+    return screen_field(page, "Название, юр. название или IDNO")
 
 
 def rows(page: Page):
@@ -111,7 +112,7 @@ def test_company_create_shows_card_and_row(cp: Page):
         "Телефон": "+37369000001",
     }
     name = f"{NAME_PREFIX} {stamp}"
-    cp.locator("main").get_by_role("button", name="Добавить контрагента").first.click()
+    screen_button(cp, "Добавить контрагента").first.click()
     form = modal(cp, "Новый контрагент")
     form.get_by_placeholder("Альфа SRL").fill(name)
     for label, value in values.items():
@@ -146,7 +147,7 @@ def test_company_create_shows_card_and_row(cp: Page):
 def test_person_create_and_kind_filter(cp: Page):
     company = create_card(cp)
     name = f"{NAME_PREFIX} Ион {unique()}"
-    cp.locator("main").get_by_role("button", name="Добавить контрагента").first.click()
+    screen_button(cp, "Добавить контрагента").first.click()
     form = modal(cp, "Новый контрагент")
     form.get_by_role("button", name="Компания").click()
     cp.get_by_role("option", name="Физическое лицо").click()
@@ -159,12 +160,12 @@ def test_person_create_and_kind_filter(cp: Page):
     close_modal(cp, name)
     find(cp, NAME_PREFIX)
 
-    cp.locator("main").get_by_role("button", name="Все виды").click()
+    screen_button(cp, "Все виды").click()
     cp.get_by_role("option", name="Физическое лицо").click()
     expect(rows(cp).filter(has_text=name)).to_have_count(1)
     expect(rows(cp).filter(has_text=company["name"])).to_have_count(0)
 
-    cp.locator("main").get_by_role("button", name="Физическое лицо").click()
+    screen_button(cp, "Физическое лицо").click()
     cp.get_by_role("option", name="Компания").click()
     expect(rows(cp).filter(has_text=company["name"])).to_have_count(1)
     expect(rows(cp).filter(has_text=name)).to_have_count(0)
@@ -174,7 +175,7 @@ def test_person_create_and_kind_filter(cp: Page):
 @pytest.mark.writes_data
 def test_duplicate_idno_blocked(cp: Page):
     existing = create_card(cp)
-    cp.locator("main").get_by_role("button", name="Добавить контрагента").first.click()
+    screen_button(cp, "Добавить контрагента").first.click()
     form = modal(cp, "Новый контрагент")
     form.get_by_placeholder("Альфа SRL").fill(f"{NAME_PREFIX} дубль {unique()}")
 
@@ -251,7 +252,7 @@ def test_archive_and_restore(cp: Page):
     close_modal(cp, card["name"])
     expect(rows(cp).filter(has_text=card["name"])).to_have_count(0)
 
-    main.get_by_role("button", name="Архив", exact=True).click()
+    screen_button(cp, "Архив", exact=True).click()
     row = rows(cp).filter(has_text=card["name"])
     expect(row).to_contain_text("в архиве")
     row.click()
@@ -261,7 +262,7 @@ def test_archive_and_restore(cp: Page):
     assert restored.value.ok
     assert api_get(cp, f"{API}{card['id']}").json()["archived"] is False
     close_modal(cp, card["name"])
-    main.get_by_role("button", name="Действующие").click()
+    screen_button(cp, "Действующие").click()
     expect(rows(cp).filter(has_text=card["name"])).to_have_count(1)
 
 

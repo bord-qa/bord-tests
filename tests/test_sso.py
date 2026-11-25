@@ -9,15 +9,20 @@ helpers/modules.py на домене bord.one: нет формы пароля, �
 - app.ecom.md, app.facturi.md, app.targeting.md — другие домены, кука до них
   не доходит, там своя форма входа (так ли задумано — вопрос открыт, не тестируем).
 """
+import re
+
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from helpers.api import api_get
 from helpers.modules import TILE_HREF
 from helpers.wait import settle
 
 pytestmark = pytest.mark.requires_auth
 
 DISABLED = ("lms.bord.one", "rms.bord.one")
+HOST_MODULE = {"dms.bord.one": "dms", "crm.bord.one": "crm", "hrm.bord.one": "hrm", "wms.bord.one": "wms",
+               "mms.bord.one": "mms", "hds.bord.one": "helpdesk", "fms.bord.one": "finance", "ads.bord.one": "marketing"}
 SYSTEMS = sorted({url for url in TILE_HREF.values()
                   if url.startswith("https://") and ".bord.one/" in url and url.split("/")[2] not in DISABLED})
 
@@ -35,10 +40,23 @@ def test_system_opens_without_password(auth_page: Page, url):
 
     host = url.split("/")[2]
     assert auth_page.url.startswith(f"https://{host}/"), f"увело на {auth_page.url}"
+    # модуль выключен в BORD QA (25.11 — DMS): система пишет «… не подключён» — это не про вход; пропускаем,
+    # только если модуль и правда выключен по /api/subscription
+    if auth_page.get_by_text(re.compile("модуль .* не подключён")).count():
+        key = HOST_MODULE.get(host)
+        hub = auth_page.context.new_page()  # токен BORD лежит в localStorage app.bord.one, не системы
+        hub.goto("https://app.bord.one/admin")
+        settle(hub)
+        modules = {m["key"]: m["enabled"] for m in api_get(hub, "/api/subscription").json()["modules"]}
+        hub.close()
+        assert key and modules.get(key) is False, f"{host}: «не подключён», но модуль {key} включён: {modules.get(key)}"
+        pytest.skip(f"{host}: модуль {key} выключен в BORD QA")
     assert "/login" not in auth_page.url, f"{url}: попросили войти — {auth_page.url}"
     expect(auth_page.locator("input[type=password]")).to_have_count(0)
-    # в свёрнутой боковой панели название организации есть, но скрыто — берём видимое
-    expect(auth_page.locator("text=BORD QA >> visible=true").first).to_be_visible(timeout=15_000)
+    # организация: видимый текст «BORD QA» или (с ~20.11 в CRM/DMS) значок с title «Организация: BORD QA · <тариф>»,
+    # который на узком экране спрятан
+    org = auth_page.locator("text=BORD QA >> visible=true").or_(auth_page.locator('[title^="Организация: BORD QA"]'))
+    expect(org.first).to_be_attached(timeout=15_000)
 
 
 # Кейс: Гость не получает данных

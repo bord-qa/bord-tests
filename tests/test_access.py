@@ -27,6 +27,7 @@ from playwright.sync_api import Page, expect
 
 from helpers.api import api_delete, api_get
 from helpers.wait import settle
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -111,7 +112,7 @@ def test_people_matrix_matches_api(access: Page):
     matrix = resp.json()
 
     # с 08.11 «Доступы» — вкладки «Команды»: матрица живёт на «Доступ к модулям»
-    access.locator("main").get_by_role("button", name="Доступ к модулям", exact=True).click()
+    screen_button(access, "Доступ к модулям", exact=True).click()
     expect(access).to_have_url(re.compile(r"tab=access"))
 
     rows = access.locator("main table tbody tr")
@@ -134,12 +135,12 @@ def test_module_role_create_edit_delete(access: Page):
     tab = module_tab(access, mod["name"])
     tab.click()
 
-    main.get_by_role("button", name="Новая роль").click()
-    main.get_by_placeholder("Название роли, например «Финансовый директор»").fill(name)
-    main.get_by_placeholder("Что делает человек с этой ролью").fill("роль автотеста")
+    screen_button(access, "Новая роль").click()
+    screen_field(access, "Название роли, например «Финансовый директор»").fill(name)
+    screen_field(access, "Что делает человек с этой ролью").fill("роль автотеста")
     main.locator("label[title='tasks.view'] input").check()
     with access.expect_response(lambda r: r.url.endswith(MODULE_ROLES) and r.request.method == "POST") as created:
-        main.get_by_role("button", name="Создать").click()
+        screen_button(access, "Создать").click()
 
     assert created.value.status == 201, created.value.text()
     sent = created.value.request.post_data_json
@@ -152,13 +153,13 @@ def test_module_role_create_edit_delete(access: Page):
 
     main.locator("label[title='tasks.manage'] input").check()
     with access.expect_response(lambda r: f"{MODULE_ROLES}/{role['id']}" in r.url and r.request.method in ("PUT", "PATCH")) as edited:
-        main.get_by_role("button", name="Сохранить").click()
+        screen_button(access, "Сохранить").click()
 
     assert edited.value.ok, edited.value.text()
     saved = next(r for r in module(access, MODULE)["roles"] if r["id"] == role["id"])
     assert sorted(saved["permissions"]) == ["tasks.manage", "tasks.view"]
 
-    main.get_by_role("button", name="Удалить", exact=True).click()
+    screen_button(access, "Удалить", exact=True).click()
     dialog = access.get_by_role("dialog", name=f"Удалить роль «{name}»?")
     with access.expect_response(lambda r: f"{MODULE_ROLES}/{role['id']}" in r.url and r.request.method == "DELETE") as deleted:
         dialog.get_by_role("button", name="Да").click()
@@ -179,6 +180,6 @@ def test_template_role_cannot_be_deleted(access: Page):
     role_card(access, template["name"]).click()
 
     main = access.locator("main")
-    expect(main.get_by_placeholder("Название роли, например «Финансовый директор»")).to_have_value(template["name"])
-    expect(main.get_by_role("button", name="Вернуть исходную")).to_be_visible()
-    expect(main.get_by_role("button", name="Удалить", exact=True)).to_have_count(0)
+    expect(screen_field(access, "Название роли, например «Финансовый директор»")).to_have_value(template["name"])
+    expect(screen_button(access, "Вернуть исходную")).to_be_visible()
+    expect(screen_button(access, "Удалить", exact=True)).to_have_count(0)

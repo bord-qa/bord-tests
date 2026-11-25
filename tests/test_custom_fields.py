@@ -28,6 +28,7 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_delete, api_get, api_post
 from helpers.modal import modal
 from helpers.wait import settle
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -70,7 +71,7 @@ def cleanup(page: Page):
 @pytest.fixture
 def cf(auth_page: Page):
     auth_page.goto("/admin/settings/custom-fields")
-    expect(auth_page.locator("main").get_by_role("button", name="Добавить поле")).to_be_visible()
+    expect(screen_button(auth_page, "Добавить поле")).to_be_visible()
     settle(auth_page)
     yield auth_page
     cleanup(auth_page)
@@ -78,7 +79,7 @@ def cf(auth_page: Page):
 
 def reload(page: Page):
     page.reload()
-    expect(page.locator("main").get_by_role("button", name="Добавить поле")).to_be_visible()
+    expect(screen_button(page, "Добавить поле")).to_be_visible()
     settle(page)
 
 
@@ -87,12 +88,13 @@ def row(page: Page, name: str):
 
 
 def open_new(page: Page):
-    page.locator("main").get_by_role("button", name="Добавить поле").click()
+    screen_button(page, "Добавить поле").click()
     return modal(page, "Новое кастомное поле")
 
 
 def pick(page: Page, scope, current: str, option: str):
-    scope.get_by_role("button", name=current, exact=True).click()
+    # шапка продублирована (десктоп / мобильная) — видимая кнопка
+    scope.locator("button:visible").filter(has_text=re.compile(rf"^\s*{re.escape(current)}\s*$")).first.click()
     page.get_by_role("option", name=option, exact=True).click()
 
 
@@ -110,12 +112,13 @@ def test_module_entities_load(cf: Page, tab):
     main = cf.locator("main")
 
     if tab == "CRM":  # открыта по умолчанию — клик по ней ничего не грузит
-        main.get_by_role("button", name="HRM", exact=True).click()
+        screen_button(cf, "HRM", exact=True).click()
     with cf.expect_response(lambda r: f"module={module}&" in r.url) as loaded:
-        main.get_by_role("button", name=tab, exact=True).click()
+        screen_button(cf, tab, exact=True).click()
 
     assert loaded.value.ok, f"{tab}: {loaded.value.status} {loaded.value.text()}"
-    main.locator("button[aria-haspopup='listbox']").click()
+    # выпадашка сущности с ~20.11 в шапке экрана
+    cf.locator("header button[aria-haspopup='listbox']:visible").or_(main.locator("button[aria-haspopup='listbox']")).first.click()
     expect(cf.get_by_role("option")).to_have_text(labels)
     cf.keyboard.press("Escape")
 
@@ -307,7 +310,7 @@ def test_field_belongs_to_its_entity(cf: Page):
     expect(row(cf, contact["field_name"])).to_have_count(0)
 
     with cf.expect_response(lambda r: "entity_type=contact" in r.url):
-        pick(cf, cf.locator("main"), "Лид", "Контакт")
+        pick(cf, cf.locator("header"), "Лид", "Контакт")
 
     expect(row(cf, contact["field_name"])).to_have_count(1)
     expect(row(cf, lead["field_name"])).to_have_count(0)

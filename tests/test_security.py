@@ -50,6 +50,7 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_delete, api_get, api_patch, api_post
 from helpers.modal import modal
 from helpers.wait import settle
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -162,7 +163,8 @@ def rows(page: Page, text: str):
 
 
 def pick(page: Page, scope, current: str, option: str):
-    scope.get_by_role("button", name=current, exact=True).click()
+    # фильтры списка с ~20.11 в шапке (она продублирована: десктоп / мобильная) — видимая кнопка
+    scope.locator("button:visible").filter(has_text=re.compile(rf"^\s*{re.escape(current)}\s*$")).first.click()
     page.get_by_role("option", name=option, exact=True).click()
 
 
@@ -178,16 +180,27 @@ def field(form, label: str):
 
 def open_systems(page: Page):
     tab(page, "Системы").click()
-    expect(page.locator("main").get_by_role("button", name="Добавить систему")).to_be_visible()
+    expect(screen_button(page, "Добавить систему")).to_be_visible()
 
 
 # Кейс: Счётчики над списком совпадают с API
 @pytest.mark.smoke
 def test_counters_match_summary(security: Page):
-    data = summary(security)
+    # данные реестра меняются и без нас (почасовая сверка «BORD», чужие ручные проверки) — при расхождении
+    # перечитываем экран и API, до 3 раз; стабильное расхождение — падение
+    for attempt in range(3):
+        data = summary(security)
+        shown = {key: counter(security, label).text_content() for key, label in COUNTERS.items()}
+        wrong = {key: (shown[key], data[key]) for key, label in COUNTERS.items()
+                 if not re.match(rf"^\s*{data[key]}\s*{label}\s*$", shown[key] or "")}
+        if not wrong:
+            break
+        reload(security)
+    assert not wrong, f"счётчики ≠ /summary: {wrong}"
 
-    for key, label in COUNTERS.items():
-        expect(counter(security, label), label).to_have_text(re.compile(rf"^{data[key]}\s*{label}$"))
+
+def active_ids(page: Page) -> set:
+    return {g["id"] for g in api_get(page, f"{API}grants?state=active").json()["items"]}
 
 
 # Кейс: Встроенная система «BORD» показывает участников организации
@@ -196,8 +209,10 @@ def test_builtin_bord_system_lists_org_members(security: Page):
     users = api_get(security, "/api/admin/auth/users").json()
     bord = [g for g in api_get(security, f"{API}grants?state=active").json()["items"] if g["system"]["name"] == "BORD"]
 
-    # сотрудник HRM без почты — тоже участник организации (email = None): сортируем через str
-    assert sorted((g["login"] for g in bord), key=str) == sorted((u["email"] for u in users), key=str)
+    # Сотрудники HRM без почты тоже попадают во «BORD» (login "", holder_id null), реестр сверяется с участниками
+    # раз в час (hh:15) — их число плавает от чужих ручных проверок и уборки HRM. Сверяем участников с почтой.
+    with_email = {u["email"] for u in users if u["email"]}
+    assert {g["login"] for g in bord if g["login"]} == with_email
     for user in (u for u in users if u["email"]):
         line = rows(security, user["email"])
         expect(line).to_contain_text("BORD")
@@ -212,7 +227,7 @@ def test_add_system_via_form(security: Page):
     before = summary(security)
     title = name()
     open_systems(security)
-    security.locator("main").get_by_role("button", name="Добавить систему").click()
+    screen_button(security, "Добавить систему").click()
     form = modal(security, "Новая система")
     form.get_by_role("button", name="Сохранить").click()
     expect(form.get_by_text("Название обязательно", exact=True)).to_be_visible()
@@ -267,7 +282,7 @@ def test_grant_access_and_revoke(security: Page):
     reload(security)
     main = security.locator("main")
 
-    main.get_by_role("button", name="Выдать доступ").click()
+    screen_button(security, "Выдать доступ").click()
     form = modal(security, "Выдать доступ")
     pick_by_label(security, form, "Система", system["name"])
     holder = my_name(security)
@@ -286,7 +301,8 @@ def test_grant_access_and_revoke(security: Page):
     line = rows(security, system["name"])
     for text in (holder, "Администратор", "qa-login@example.com", "бессрочно"):
         expect(line, text).to_contain_text(text)
-    assert summary(security)["active_grants"] == before["active_grants"] + 1
+    # общий счётчик плавает (чужие проверки, почасовая сверка «BORD» с участниками) — проверяем свою запись
+    assert grant["id"] in active_ids(security)
 
     line.get_by_role("button", name="Отозван").click()
     dialog = security.get_by_role("dialog", name=re.compile("^Отметить, что доступ"))
@@ -297,7 +313,7 @@ def test_grant_access_and_revoke(security: Page):
 
     assert revoked.value.ok and revoked.value.request.post_data_json == {"note": "удалили учётку (автотест)"}
     expect(rows(security, system["name"])).to_have_count(0)
-    assert summary(security)["active_grants"] == before["active_grants"]
+    assert grant["id"] not in active_ids(security)
     pick(security, main, "Действующие", "Отозванные")
     expect(rows(security, system["name"])).to_contain_text(f"отозван {dt.date.today():%d.%m.%Y}")
 
@@ -322,7 +338,7 @@ def test_contractor_grant(security: Page):
     system = create_system(security)
     reload(security)
 
-    security.locator("main").get_by_role("button", name="Выдать доступ").click()
+    screen_button(security, "Выдать доступ").click()
     form = modal(security, "Выдать доступ")
     pick_by_label(security, form, "Система", system["name"])
     form.get_by_text("Нет в BORD (подрядчик)").click()
@@ -363,7 +379,7 @@ def test_search_grants(security: Page):
     system = create_system(security)
     create_grant(security, system, login="qa-search-login@example.com")
     reload(security)
-    box = security.locator("main").get_by_placeholder("Кто, система или логин")
+    box = screen_field(security, "Кто, система или логин")
 
     for query in (system["name"], "qa-search-login"):
         box.fill(query)
@@ -386,12 +402,12 @@ def test_archive_and_restore_system(security: Page):
 
     assert archived.value.request.post_data_json == {"archived": True}
     expect(rows(security, system["name"])).to_have_count(0)
-    main.get_by_role("button", name="Архив", exact=True).click()
+    screen_button(security, "Архив", exact=True).click()
     with security.expect_response(lambda r: r.url.endswith(f"systems/{system['id']}") and r.request.method == "PATCH") as restored:
         rows(security, system["name"]).get_by_role("button", name="Вернуть из архива").click()
 
     assert restored.value.request.post_data_json == {"archived": False}
-    main.get_by_role("button", name="Действующие", exact=True).click()
+    screen_button(security, "Действующие", exact=True).click()
     expect(rows(security, system["name"])).to_have_count(1)
 
 
@@ -488,7 +504,7 @@ def test_offboarding_contractor(security: Page):
     open_tab(security, "offboardings")
     main = security.locator("main")
 
-    main.get_by_role("button", name="Начать увольнение").click()
+    screen_button(security, "Начать увольнение").click()
     form = modal(security, "Начать увольнение")
     expect(form.get_by_role("button", name="— не сотрудник BORD (подрядчик) —")).to_be_visible()
     form.get_by_text("Имя", exact=True).locator("xpath=following-sibling::input[1]").fill(leaving)
@@ -524,7 +540,7 @@ def test_offboarding_contractor(security: Page):
     # сразу после закрытия список перечитывается сам (тот же state=done) и клик
     # по «Закрытым» может потеряться — жмём, пока карточка не появится
     for _ in range(4):
-        main.get_by_role("button", name="Закрытые", exact=True).click()
+        screen_button(security, "Закрытые", exact=True).click()
         try:
             expect(closed).to_be_visible(timeout=4_000)
             break

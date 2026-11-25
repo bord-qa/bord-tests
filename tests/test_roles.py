@@ -23,6 +23,7 @@ from playwright.sync_api import Page, expect
 
 from helpers.api import api_delete, api_get, api_post
 from helpers.wait import settle
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -59,10 +60,10 @@ def roles_page(auth_page: Page):
 
 @pytest.fixture
 def editor(roles_page: Page):
-    roles_page.locator("main").get_by_role("button", name="Редактор ролей").click()
+    screen_button(roles_page, "Редактор ролей").click()
     # с 08.11 роли — вкладка «Команды»: /admin/team?tab=roles&sub=editor
     expect(roles_page).to_have_url(re.compile(r"(tab|sub)=editor"))
-    expect(roles_page.locator("main").get_by_role("button", name="Создать роль")).to_be_visible()
+    expect(screen_button(roles_page, "Создать роль")).to_be_visible()
     return roles_page
 
 
@@ -73,13 +74,13 @@ def role_card(page: Page, name: str):
 
 def create_in_form(page: Page, name: str, labels: list[str]) -> dict:
     main = page.locator("main")
-    main.get_by_role("button", name="Создать роль").click()
+    screen_button(page, "Создать роль").click()
     main.get_by_role("textbox", name="Название").fill(name)
     main.get_by_role("textbox", name="Описание").fill("роль автотеста")
     for label in labels:
         main.get_by_role("checkbox", name=label).check()
     with page.expect_response(lambda r: r.url.endswith(ORG_ROLES) and r.request.method == "POST") as created:
-        main.get_by_role("button", name="Сохранить").click()
+        screen_button(page, "Сохранить").click()
     assert created.value.status == 201, created.value.text()
     return created.value.json()
 
@@ -122,7 +123,7 @@ def test_never_grantable_permissions_locked(editor: Page):
         f"Выдать можно {len(data['grantable'])} из {len(data['all_permissions'])} прав платформы"
     )
 
-    main.get_by_role("button", name="Создать роль").click()
+    screen_button(editor, "Создать роль").click()
     for perm in data["all_permissions"]:
         box = main.get_by_role("checkbox", name=data["permission_labels"][perm])
         if perm in data["never_grantable"]:
@@ -130,7 +131,7 @@ def test_never_grantable_permissions_locked(editor: Page):
             expect(box.locator("xpath=..")).to_contain_text("никогда")
         else:
             expect(box, perm).to_be_enabled()
-    main.get_by_role("button", name="Отменить").click()
+    screen_button(editor, "Отменить").click()
 
 
 # Кейс: Своя роль: создать, изменить, удалить
@@ -152,7 +153,7 @@ def test_custom_role_create_edit_delete(editor: Page):
     expect(main.get_by_role("textbox", name="Название")).to_have_value(name)
     main.get_by_role("checkbox", name="Комментарии — просмотр").check()
     with editor.expect_response(lambda r: f"{ORG_ROLES}/{role['id']}" in r.url and r.request.method in ("PUT", "PATCH")) as edited:
-        main.get_by_role("button", name="Сохранить").click()
+        screen_button(editor, "Сохранить").click()
 
     assert edited.value.ok, edited.value.text()
     assert "view_comments" in perms(editor)["roles"][role["slug"]]["permissions"]

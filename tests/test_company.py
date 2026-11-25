@@ -21,6 +21,7 @@ from playwright.sync_api import Page, expect
 
 from helpers.api import api_get, api_put
 from helpers.wait import settle
+from helpers.ui import screen_field, screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -51,12 +52,12 @@ class CompanyForm:
         # с 02.11 в форме вторая выпадашка — «Страна»; отрасль берём по подписи
         # (с 17.11 подпись «Направление бизнеса», label[for=ob-industry])
         self.industry = main.locator("label[for='ob-industry'] + button[aria-haspopup='listbox']")
-        self.legal_name = main.get_by_placeholder("Exemplu SRL")
-        self.idno = main.get_by_placeholder("13 цифр")
+        self.legal_name = screen_field(page, "Exemplu SRL")
+        self.idno = screen_field(page, "13 цифр")
         self.vat_code = field("Код НДС")
         self.address = field("Адрес")
-        self.phone = main.get_by_placeholder("+373 …")
-        self.save = main.get_by_role("button", name="Сохранить")
+        self.phone = screen_field(page, "+373 …")
+        self.save = screen_button(page, "Сохранить")
         self.saved = main.get_by_text("Сохранено", exact=True)
 
     def submit(self):
@@ -80,7 +81,7 @@ def form(auth_page: Page):
     # с 08.11 реквизиты (юр. название, НДС, адрес, телефон) свёрнуты под ссылкой —
     # по умолчанию их подтягивает IDNO из госреестра kyc.bord.one
     auth_page.locator("main").get_by_text("Исправить реквизиты вручную", exact=True).click()
-    expect(auth_page.locator("main").get_by_placeholder("Exemplu SRL")).to_be_visible()
+    expect(screen_field(auth_page, "Exemplu SRL")).to_be_visible()
     before = company(auth_page)
     yield CompanyForm(auth_page)
     if company(auth_page) != before:

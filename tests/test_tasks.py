@@ -40,6 +40,7 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_delete, api_get, api_patch, api_post
 from helpers.modal import close_modal, modal
 from helpers.wait import settle
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -97,7 +98,7 @@ def comments(page: Page, task_id: int) -> list:
 @pytest.fixture
 def tasks(auth_page: Page):
     auth_page.goto("/admin/tasks")
-    expect(auth_page.locator("main").get_by_role("button", name="Новая задача")).to_be_visible()
+    expect(screen_button(auth_page, "Новая задача")).to_be_visible()
     settle(auth_page)
     yield auth_page
     delete_qa_tasks(auth_page)
@@ -105,7 +106,7 @@ def tasks(auth_page: Page):
 
 def reload(page: Page):
     page.reload()
-    expect(page.locator("main").get_by_role("button", name="Новая задача")).to_be_visible()
+    expect(screen_button(page, "Новая задача")).to_be_visible()
     settle(page)
 
 
@@ -118,7 +119,7 @@ def counter(page: Page, label: str):
 
 
 def tab(page: Page, name: str):
-    return page.locator("main").get_by_role("button", name=name, exact=True)
+    return screen_button(page, name, exact=True)
 
 
 def form_input(form, label: str):
@@ -154,7 +155,7 @@ def test_create_task_via_form(tasks: Page):
     name = title()
     yesterday = dt.date.today() - dt.timedelta(days=1)
     before = summary(tasks)
-    tasks.locator("main").get_by_role("button", name="Новая задача").click()
+    screen_button(tasks, "Новая задача").click()
     form = modal(tasks, "Новая задача")
     form_input(form, "Что нужно сделать").fill(name)
     form_input(form, "Подробности").fill("подробности автотеста")
@@ -186,7 +187,7 @@ def test_create_task_via_form(tasks: Page):
 def test_empty_title_blocked(tasks: Page):
     posts = []
     tasks.on("request", lambda r: posts.append(r.url) if r.method == "POST" and r.url.endswith(API) else None)
-    tasks.locator("main").get_by_role("button", name="Новая задача").click()
+    screen_button(tasks, "Новая задача").click()
     form = modal(tasks, "Новая задача")
 
     form.get_by_role("button", name="Поставить").click()
@@ -304,18 +305,18 @@ def test_search_and_filters(tasks: Page):
     main = tasks.locator("main")
 
     with tasks.expect_response(lambda r: API in r.url and "q=" in r.url):
-        main.get_by_placeholder("Поиск по названию").fill(finance["title"])
+        screen_field(tasks, "Поиск по названию").fill(finance["title"])
     expect(row(tasks, finance["title"])).to_have_count(1)
     expect(row(tasks, nobody["title"])).to_have_count(0)
-    main.get_by_placeholder("Поиск по названию").fill(NAME_PREFIX)
+    screen_field(tasks, "Поиск по названию").fill(NAME_PREFIX)
     expect(row(tasks, nobody["title"])).to_have_count(1)
 
-    pick(tasks, main, "Все направления", "Финансы")
+    pick(tasks, tasks.locator("header"), "Все направления", "Финансы")
     expect(row(tasks, finance["title"])).to_have_count(1)
     expect(row(tasks, nobody["title"])).to_have_count(0)
-    pick(tasks, main, "Финансы", "Все направления")
+    pick(tasks, tasks.locator("header"), "Финансы", "Все направления")
 
-    pick(tasks, main, "Все исполнители", me(tasks)["name"])
+    pick(tasks, tasks.locator("header"), "Все исполнители", me(tasks)["name"])
     expect(row(tasks, finance["title"])).to_have_count(1)
     expect(row(tasks, nobody["title"])).to_have_count(0)
 

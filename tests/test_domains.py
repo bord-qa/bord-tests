@@ -30,6 +30,7 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_delete, api_get, api_post
 from helpers.modal import modal
 from helpers.wait import settle
+from helpers.ui import screen_button, screen_field
 
 pytestmark = pytest.mark.requires_auth
 
@@ -91,7 +92,7 @@ def cleanup(page: Page):
 @pytest.fixture
 def dom(auth_page: Page):
     auth_page.goto("/admin/domains")
-    expect(auth_page.locator("main").get_by_role("button", name=re.compile("^Источники"))).to_be_visible()
+    expect(screen_button(auth_page, re.compile(r"^\s*Источники"))).to_be_visible()
     settle(auth_page)
     yield auth_page
     cleanup(auth_page)
@@ -106,7 +107,7 @@ def source(dom: Page) -> dict:
 
 def reload(page: Page):
     page.reload()
-    expect(page.locator("main").get_by_role("button", name=re.compile("^Источники"))).to_be_visible()
+    expect(screen_button(page, re.compile(r"^\s*Источники"))).to_be_visible()
     settle(page)
 
 
@@ -119,8 +120,8 @@ def counter(page: Page, label: str):
 
 
 def sources_tab(page: Page):
-    page.locator("main").get_by_role("button", name=re.compile("^Источники")).click()
-    expect(page.locator("main").get_by_role("button", name="Ручной источник")).to_be_visible()
+    screen_button(page, re.compile(r"^\s*Источники")).click()
+    expect(screen_button(page, "Ручной источник")).to_be_visible()
 
 
 def source_card(page: Page, src: dict):
@@ -148,7 +149,7 @@ def test_counters_match_summary(dom: Page):
 def test_manual_source_create(dom: Page):
     name = f"{SOURCE_PREFIX} источник {stamp()}"
     sources_tab(dom)
-    dom.locator("main").get_by_role("button", name="Ручной источник").click()
+    screen_button(dom, "Ручной источник").click()
     form = modal(dom, "Ручной источник")
     form.locator("input").first.fill(name)
     form.get_by_placeholder("https://").fill("https://qa-registrar.example.com")
@@ -172,7 +173,7 @@ def test_add_domain_via_form(dom: Page, source):
     before = summary(dom)
     name = domain_name()
     expires = dt.date.today() + dt.timedelta(days=10)
-    dom.locator("main").get_by_role("button", name="Домен вручную").click()
+    screen_button(dom, "Домен вручную").click()
     form = modal(dom, "Новый домен")
     save = form.get_by_role("button", name="Сохранить")
     expect(save).to_be_disabled()
@@ -319,7 +320,7 @@ def test_search(dom: Page, source):
     item = create_domain(dom, source, note="поиск-автотеста")
     other = create_domain(dom, source)
     reload(dom)
-    box = dom.locator("main").get_by_placeholder("Поиск по домену или заметке")
+    box = screen_field(dom, "Поиск по домену или заметке")
 
     for query in (item["name"], "поиск-автотеста"):
         box.fill(query)

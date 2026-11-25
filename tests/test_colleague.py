@@ -30,6 +30,7 @@ from playwright.sync_api import Page, expect
 from helpers.api import api_delete, api_get, api_post, api_put
 from helpers.modal import modal
 from helpers.wait import settle
+from helpers.ui import screen_button
 
 pytestmark = pytest.mark.requires_auth
 
@@ -186,9 +187,9 @@ def test_task_assigned_to_colleague(owner: Page, colleague_page: Page, colleague
     name = f"{NAME_PREFIX} задача коллеге {int(time.time() * 1000)}"
     owner.goto("/admin/tasks")
     main = owner.locator("main")
-    expect(main.get_by_role("button", name="Новая задача")).to_be_visible()
+    expect(screen_button(owner, "Новая задача")).to_be_visible()
     settle(owner)
-    main.get_by_role("button", name="Новая задача").click()
+    screen_button(owner, "Новая задача").click()
     form = modal(owner, "Новая задача")
     form.get_by_text("Что нужно сделать", exact=True).locator("xpath=following-sibling::*[self::input or self::textarea][1]").fill(name)
     form.get_by_role("button", name="Не назначено", exact=True).click()

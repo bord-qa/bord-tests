@@ -73,7 +73,10 @@ def test_subscriptions_match_api(billing):
     modules = priced(data)
     assert modules, "в BORD QA нет модулей с ценой — проверять нечего"
 
-    expect(page.locator("main li").filter(has_text="Оплатить картой")).to_have_count(len(modules))
+    # строки «Подписок» рисуются из /billing → after_trial; каждая должна быть модулем из /api/subscription
+    billed = api_get(page, BILLING_API).json()["after_trial"]
+    expect(page.locator("main li").filter(has_text="Оплатить картой")).to_have_count(len(billed))
+    orphan = sorted({b["key"] for b in billed} - {m["key"] for m in modules})
     for module in modules:
         price = module["price"]
         row = subscription(page, module)
@@ -90,6 +93,9 @@ def test_subscriptions_match_api(billing):
             unit = "чел." if price["unit_name"] == "пользователь" else price["unit_name"]
             expect(row).to_contain_text(re.compile(
                 rf"\({price['units']} {re.escape(unit)} ×\s+{lei(price['unit_bani'])}\s+лей\)"))
+    if orphan == ["cms"]:
+        pytest.xfail("bord-669: подписка CMS есть в биллинге, модуля CMS нет в «Модулях» и /api/subscription")
+    assert not orphan, f"подписки без модуля в /api/subscription: {orphan}"
 
 
 # Кейс: Кнопки подписки: оплата и отмена у всех, смена тарифа — если есть из чего выбрать
