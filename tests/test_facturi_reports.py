@@ -27,7 +27,7 @@ import re
 import pytest
 from playwright.sync_api import Page, Response, expect
 
-from helpers.facturi import Books, open_fx
+from helpers.facturi import screen, Books, open_fx
 
 pytestmark = pytest.mark.requires_auth
 
@@ -158,7 +158,7 @@ def test_cash_plan_matches_api(fx_page: Page):
             expect(rows.nth(i)).to_contain_text(re.compile(money(end)))
     main = fx_page.locator("main")
     expect(main).to_contain_text(re.compile(r"Старт — подтверждённые остатки\s*" + money(data["start"]["confirmed_mdl"])))
-    main.get_by_role("button", name="Без новых продаж", exact=True).click()
+    screen(main).get_by_role("button", name="Без новых продаж", exact=True).click()
     expect(rows).to_have_count(len(data["scenarios"].get("no_new_sales", data["scenarios"]["as_is"])["weeks"]))
 
 

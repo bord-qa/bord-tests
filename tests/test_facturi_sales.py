@@ -29,7 +29,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (QA_PREFIX, confirm, maybe_confirm, field, fx_delete, fx_get, fx_json, fx_post, fx_put, open_fx, pick,
+from helpers.facturi import (screen, QA_PREFIX, confirm, maybe_confirm, field, fx_delete, fx_get, fx_json, fx_post, fx_put, open_fx, pick,
                              stamp, tick)
 
 pytestmark = pytest.mark.requires_auth
@@ -196,10 +196,10 @@ def test_estimate_counts_match_api(fx_page: Page, docs):
     by_status = counts.get("counts", counts)
 
     main = fx_page.locator("main")
-    expect(main.get_by_role("button", name=f"Все ({by_status['all']})")).to_be_visible()
+    expect(screen(main).get_by_role("button", name=f"Все ({by_status['all']})")).to_be_visible()
     for label, key in (("Черновики", "draft"), ("Отправлено", "sent"), ("Принято", "accepted"),
                        ("Отклонено", "declined"), ("Конвертирован", "converted")):
-        expect(main.get_by_role("button", name=f"{label} ({by_status.get(key, 0)})")).to_be_visible()
+        expect(screen(main).get_by_role("button", name=f"{label} ({by_status.get(key, 0)})")).to_be_visible()
 
 
 def open_estimate(page: Page, est: dict):
@@ -314,7 +314,7 @@ def test_payment_invoice_counts_match_api(fx_page: Page, docs):
     main = fx_page.locator("main")
     for label, key in (("Черновик", "draft"), ("Отправлен", "sent"), ("Оплачен", "paid"),
                        ("Просрочен", "overdue"), ("Отменён", "cancelled")):
-        expect(main.get_by_role("button", name=f"{label} ({by_status.get(key, 0)})")).to_be_visible()
+        expect(screen(main).get_by_role("button", name=f"{label} ({by_status.get(key, 0)})")).to_be_visible()
 
 
 # Кейс: Счёт на оплату — PDF собирается
@@ -525,7 +525,7 @@ def test_sale_stages(fx_page: Page, docs):
     row.click()
     main = fx_page.locator("main")
     expect(main).to_contain_text(est["number"])
-    expect(main.get_by_role("button", name="Конвертировать счёт в накладную")).to_be_visible()
+    expect(screen(main).get_by_role("button", name="Конвертировать счёт в накладную")).to_be_visible()
     expect(main).to_contain_text(re.compile(r"0,00\s*/\s*" + money(1200) + r"\s*MDL"))
 
 

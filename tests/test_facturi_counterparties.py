@@ -28,7 +28,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (FACTURI, QA_PREFIX, confirm, field, fx_get, fx_json, fx_post, fx_put,
+from helpers.facturi import (screen, FACTURI, QA_PREFIX, confirm, field, fx_get, fx_json, fx_post, fx_put,
                              modal, open_fx, pick, stamp, unique_idno)
 
 pytestmark = pytest.mark.requires_auth
@@ -179,7 +179,7 @@ def test_card_matches_api(fx_page: Page, made):
     for text in (f"ИНН: {api['tax_id']}", f"Email: {api['email']}", f"Тел: {api['phone']}",
                  f"Адрес: {api['address']}", api["notes"]):
         expect(main).to_contain_text(text)
-    expect(main.get_by_role("link", name="Слить с…")).to_have_attribute("href", f"{LIST}/duplicates")
+    expect(screen(main).get_by_role("link", name="Слить с…")).to_have_attribute("href", f"{LIST}/duplicates")
 
     main.get_by_text("К списку").click()
     expect(fx_page).to_have_url(FACTURI + LIST)
@@ -201,7 +201,7 @@ def test_card_by_row_click(fx_page: Page, made):
 def test_edit(fx_page: Page, made):
     cp = made(phone="+37360000003")
     card(fx_page, cp["id"])
-    fx_page.locator("main").get_by_role("button", name="Редактировать", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Редактировать", exact=True).click()
     form = modal(fx_page, "Редактировать контрагента")
     expect(field(form, "Название")).to_have_value(cp["name"])
     expect(field(form, "Телефон")).to_have_value("+37360000003")
@@ -333,7 +333,7 @@ def test_duplicate_idno_merge_and_unmerge(fx_page: Page, made):
     card(fx_page, first["id"])
     main = fx_page.locator("main")
     expect(main).to_contain_text(f"Карточка слита в #{second['id']}")
-    main.get_by_role("button", name="Расслить", exact=True).click()
+    screen(main).get_by_role("button", name="Расслить", exact=True).click()
     with fx_page.expect_response(lambda r: f"/api/counterparties/{first['id']}/unmerge" in r.url) as unmerged:
         text = confirm(fx_page, "Да")
     assert "Вернуть карточку из слияния?" in text
@@ -352,7 +352,7 @@ def test_unmerge_cancel(fx_page: Page, made):
     fx_json(fx_post(fx_page, "/counterparties/merge", {"survivor_id": survivor["id"], "duplicate_ids": [dup["id"]]}))
 
     card(fx_page, dup["id"])
-    fx_page.locator("main").get_by_role("button", name="Расслить", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Расслить", exact=True).click()
     confirm(fx_page, "Отмена")
 
     expect(fx_page.locator("main")).to_contain_text(f"Карточка слита в #{survivor['id']}")
@@ -387,7 +387,7 @@ def test_balance_breakdown(fx_page: Page):
     card(fx_page, cp["id"])
     bd = fx_json(fx_get(fx_page, f"/counterparties/{cp['id']}/balance/breakdown", {"kind": "receivable"}))
 
-    tile = fx_page.locator("main").get_by_role("button").filter(has_text="Нам должны")
+    tile = screen(fx_page).get_by_role("button").filter(has_text="Нам должны")
     expect(tile).to_contain_text(money(bd["total_mdl"]))
     tile.click()
     panel = fx_page.locator("main").filter(has_text="Нам должны — из чего сложилось")

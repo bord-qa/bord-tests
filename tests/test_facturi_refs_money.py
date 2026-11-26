@@ -27,7 +27,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (QA_PREFIX, QA_ORG, field, fx_delete, fx_get, fx_json, fx_post, fx_put, modal,
+from helpers.facturi import (screen, QA_PREFIX, QA_ORG, field, fx_delete, fx_get, fx_json, fx_post, fx_put, modal,
                              open_fx, pick, stamp, tick)
 
 pytestmark = pytest.mark.requires_auth
@@ -167,13 +167,13 @@ def test_bank_account_type_filter(fx_page: Page, bank_accounts):
     bank = bank_accounts(type="bank")
     open_bank_accounts(fx_page)
 
-    fx_page.locator("main").get_by_role("button", name="Касса", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Касса", exact=True).click()
     expect(row(fx_page, cash["name"])).to_be_visible()
     expect(row(fx_page, bank["name"])).to_have_count(0)
     for r in fx_page.locator("main tbody tr").all():
         expect(r.locator("td").nth(1)).to_have_text("Касса")
 
-    fx_page.locator("main").get_by_role("button", name="Все типы", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Все типы", exact=True).click()
     expect(row(fx_page, bank["name"])).to_be_visible()
 
 
@@ -261,10 +261,10 @@ def test_ledger_type_tabs(fx_page: Page, ledger):
     expense = ledger(type="expense")
     open_ledger(fx_page)
 
-    fx_page.locator("main").get_by_role("button", name="Доход", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Доход", exact=True).click()
     expect(row(fx_page, income["name"])).to_be_visible()
     expect(row(fx_page, expense["name"])).to_have_count(0)
-    fx_page.locator("main").get_by_role("button", name="Все", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Все", exact=True).click()
     expect(row(fx_page, expense["name"])).to_be_visible()
 
 
@@ -296,7 +296,7 @@ def test_ledger_delete_deactivates(fx_page: Page, ledger):
     assert resp.value.ok, resp.value.status
 
     expect(row(fx_page, acc["name"])).to_have_count(0)
-    fx_page.locator("main label").filter(has_text="Показать неактивные").locator("input").check()
+    screen(fx_page).locator("label").filter(has_text="Показать неактивные").locator("input").check()
     expect(row(fx_page, acc["name"])).to_be_visible()
     again = fx_post(fx_page, "/accounts/", {"code": acc["code"], "name": "dup", "type": "expense"})
     assert again.status == 409, again.status
@@ -424,7 +424,7 @@ def org_restore(fx_page: Page):
 @pytest.mark.writes_data
 def test_org_requisites_edit(fx_page: Page, org_restore):
     open_fx(fx_page, "/admin/organizations")
-    fx_page.locator("main").get_by_role("button", name="Редактировать организацию", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Редактировать организацию", exact=True).click()
     form = modal(fx_page, "Редактировать организацию")
     expect(field(form, "Название")).to_have_value(org_restore["name"])
 

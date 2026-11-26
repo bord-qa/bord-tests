@@ -38,7 +38,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (QA_PREFIX, Books, confirm, fx_delete, fx_get, fx_json, fx_post, open_fx, stamp,
+from helpers.facturi import (screen, QA_PREFIX, Books, confirm, fx_delete, fx_get, fx_json, fx_post, open_fx, stamp,
                              unique_idno)
 
 pytestmark = pytest.mark.requires_auth
@@ -81,8 +81,8 @@ def test_dashboard_default_widgets(fx_page: Page):
     assert set(types) <= {w["type"] for w in data["widgets"]}, ", ".join(types)
     if board["virtual"]:
         assert types == [w["type"] for w in data["default_layout"]], ", ".join(types)
-    expect(main(fx_page).get_by_role("button", name="Основной", exact=True)).to_be_visible()
-    expect(main(fx_page).get_by_role("button", name="Новый", exact=True)).to_be_visible()
+    expect(screen(fx_page).get_by_role("button", name="Основной", exact=True)).to_be_visible()
+    expect(screen(fx_page).get_by_role("button", name="Новый", exact=True)).to_be_visible()
     for heading in ("С начала месяца", "Как дела у компании", "Динамика остатков", "Поступления и списания",
                     "Нам должны по срокам", "Мы должны по срокам", "Счета по статусу", "Быстрый доступ"):
         expect(main(fx_page).get_by_role("heading", name=heading, exact=True)).to_be_visible()
@@ -229,10 +229,10 @@ def test_documents_counts_match_api(fx_page: Page):
         open_fx(fx_page, "/admin/documents")
     counts = resp.value.json()["counts"]
     for key, label in STATUS_TABS.items():
-        expect(main(fx_page).get_by_role("button", name=f"{label}{counts[key]}", exact=True)).to_be_visible()
+        expect(screen(fx_page).get_by_role("button", name=f"{label}{counts[key]}", exact=True)).to_be_visible()
     mailbox = fx_json(fx_get(fx_page, "/documents/mailbox"))
     if not mailbox["configured"]:
-        expect(main(fx_page).get_by_role("button", name="Почта для документов не настроена")).to_be_visible()
+        expect(screen(fx_page).get_by_role("button", name="Почта для документов не настроена")).to_be_visible()
 
 
 @pytest.fixture
@@ -278,7 +278,7 @@ def test_document_upload_and_reject(fx_page: Page, statement_file):
         expect(card.get_by_role("row").filter(has_text="Валюта")).to_contain_text("MDL")
         expect(card.get_by_role("row").filter(has_text="Операций")).to_contain_text("1")
 
-        card.get_by_role("button", name="Отклонить", exact=True).click()
+        screen(fx_page).get_by_role("button", name="Отклонить", exact=True).click()
         box = fx_page.locator("div.fixed").filter(has_text="Отклонить документ").last
         expect(box).to_contain_text("Причина обязательна")
         submit = box.get_by_role("button", name="Отклонить", exact=True)
@@ -309,7 +309,7 @@ def test_efactura_approvals_filters(fx_page: Page):
     for button, query in (("Все", "scope=all&state=awaiting"), ("Решённые", "scope=all&state=decided"),
                           ("Не распределено", "scope=unassigned&state=decided")):
         with fx_page.expect_response(lambda r: "/api/efactura/approvals?" in r.url) as resp:
-            m.get_by_role("button", name=button, exact=True).click()
+            screen(fx_page).get_by_role("button", name=button, exact=True).click()
         assert query in resp.value.url, resp.value.url
         assert resp.value.ok
         if not resp.value.json()["items"]:

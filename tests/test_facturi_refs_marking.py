@@ -36,7 +36,7 @@ import string
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (QA_PREFIX, QA_ORG, field, fx_delete, fx_get, fx_json, fx_post, fx_put, listbox,
+from helpers.facturi import (screen, QA_PREFIX, QA_ORG, field, fx_delete, fx_get, fx_json, fx_post, fx_put, listbox,
                              modal, open_fx, pick, stamp, tick)
 
 pytestmark = pytest.mark.requires_auth
@@ -125,10 +125,10 @@ def test_category_type_tabs(fx_page: Page, categories):
     open_categories(fx_page)
     main = fx_page.locator("main")
 
-    main.get_by_role("button", name="Доходы", exact=True).click()
+    screen(main).get_by_role("button", name="Доходы", exact=True).click()
     expect(cat_row(fx_page, income["name"])).to_be_visible()
     expect(cat_row(fx_page, expense["name"])).to_have_count(0)
-    main.get_by_role("button", name="Расходы", exact=True).click()
+    screen(main).get_by_role("button", name="Расходы", exact=True).click()
     expect(cat_row(fx_page, expense["name"])).to_be_visible()
     expect(cat_row(fx_page, income["name"])).to_have_count(0)
 
@@ -149,9 +149,9 @@ def test_category_archive(fx_page: Page, categories):
     api = next(c for c in fx_json(fx_get(fx_page, "/categories/", {"active_only": "false"})) if c["id"] == cat["id"])
     assert api["is_active"] is False
     main = fx_page.locator("main")
-    main.get_by_role("button", name="Все", exact=True).click()
+    screen(main).get_by_role("button", name="Все", exact=True).click()
     expect(cat_row(fx_page, cat["name"])).to_have_count(0)
-    main.get_by_role("button", name="Архивные", exact=True).click()
+    screen(main).get_by_role("button", name="Архивные", exact=True).click()
     expect(cat_row(fx_page, cat["name"])).to_be_visible()
 
 
@@ -384,6 +384,9 @@ def test_currency_create_hide_and_revive(fx_page: Page, currencies):
         field(form, "Код").fill(code)
         field(form, "Название").fill(title)
         field(form, "Символ").fill("¤")
+        # 26.11: «Курс НБМ автоматически» включена по умолчанию и блокирует курс — ручной курс после снятия
+        expect(field(form, "Курс обмена")).to_be_disabled()
+        tick(form, "Курс НБМ автоматически", False)
         field(form, "Курс обмена").fill("2.5")
         form.get_by_role("button", name="Создать", exact=True).click()
         expect(form).to_have_count(0)
@@ -476,7 +479,7 @@ def test_opening_balance_needs_org_date(fx_page: Page, ob_counterparty):
 def test_opening_balance_crud(fx_page: Page, opening_date, ob_counterparty):
     with fx_page.expect_response(lambda r: "/api/opening-balances/" in r.url and r.request.method == "GET"):
         open_fx(fx_page, "/admin/opening-balances")
-    fx_page.locator("main").get_by_role("button", name="Новое", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Новое", exact=True).click()
     form = modal(fx_page, "Новое сальдо")
     create = form.get_by_role("button", name="Создать", exact=True)
     expect(create).to_be_disabled()
@@ -501,16 +504,16 @@ def test_opening_balance_crud(fx_page: Page, opening_date, ob_counterparty):
     expect(main).to_contain_text("сальдо автотеста")
 
     # правка — форма прямо в карточке, не окно
-    main.get_by_role("button", name="Редактировать", exact=True).click()
+    screen(main).get_by_role("button", name="Редактировать", exact=True).click()
     field(main, "Сумма (+ нам должны, - мы должны)").fill("-200")
     with fx_page.expect_response(lambda r: f"/api/opening-balances/{ob['id']}" in r.url and r.request.method == "PUT") as upd:
-        main.get_by_role("button", name="Сохранить", exact=True).click()
+        screen(main).get_by_role("button", name="Сохранить", exact=True).click()
     assert upd.value.ok, upd.value.text()
     expect(main).to_contain_text("Мы должны")
     assert fx_json(fx_get(fx_page, f"/opening-balances/{ob['id']}"))["amount"] == -200
 
     with fx_page.expect_response(lambda r: f"/api/opening-balances/{ob['id']}" in r.url and r.request.method == "DELETE") as gone:
-        main.get_by_role("button", name="Удалить", exact=True).click()
+        screen(main).get_by_role("button", name="Удалить", exact=True).click()
         maybe_confirm(fx_page)
     assert gone.value.ok
     expect(main.get_by_text(ob_counterparty["name"])).to_have_count(0)

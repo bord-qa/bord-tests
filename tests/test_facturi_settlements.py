@@ -30,7 +30,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (QA_PREFIX, field, fx_delete, fx_get, fx_json, fx_post, fx_put, modal, open_fx, pick,
+from helpers.facturi import (screen, QA_PREFIX, field, fx_delete, fx_get, fx_json, fx_post, fx_put, modal, open_fx, pick,
                              stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -96,7 +96,7 @@ def debtor_row(page: Page, name: str):
 
 
 def open_debtor_card(page: Page, name: str):
-    page.locator("main").get_by_role("button", name=name, exact=True).click()
+    screen(page).get_by_role("button", name=name, exact=True).click()
 
 
 def open_debtors(page: Page, kind: str = "receivable") -> dict:
@@ -123,7 +123,7 @@ def test_debtors_receivable_match_api(fx_page: Page, s):
     expect(main).to_contain_text(re.compile(r"Неоплаченных документов\s*" + str(summary["invoice_count"])))
     expect(main).to_contain_text(re.compile(r"Нам должны\s*" + money(summary["outstanding_total"])))
     expect(main).to_contain_text(re.compile(r"Просрочено\s*" + money(summary["overdue_total"]) + r"\s*" + str(summary["overdue_count"]) + r" док\."))
-    expect(main.get_by_role("button", name=f"Активные {data['active_count']}")).to_be_visible()
+    expect(screen(main).get_by_role("button", name=f"Активные {data['active_count']}")).to_be_visible()
 
     assert (me["invoice_count"], me["outstanding"], me["overdue"], me["max_days_overdue"]) == (1, 1000, 1000, 5), me
     row = debtor_row(fx_page, s.cp["name"])
@@ -184,7 +184,7 @@ def test_debtor_ignore(fx_page: Page, s):
     assert after["ignored_count"] == data["ignored_count"] + 1
     assert mine(after, s.cp["id"])["is_ignored"] is True
     main = fx_page.locator("main")
-    main.get_by_role("button", name=re.compile(r"^Игнор \d+$")).click()
+    screen(main).get_by_role("button", name=re.compile(r"^Игнор \d+$")).click()
     expect(debtor_row(fx_page, s.cp["name"])).to_be_visible()
 
     fx_json(fx_post(fx_page, f"/debtors/counterparty/{s.cp['id']}/ignore", {"ignored": False}))
@@ -223,7 +223,7 @@ def test_obligations_match_api(fx_page: Page, s):
     expect(main).to_contain_text(re.compile(r"Кредиторская\s*" + money(payable)))
     assert (me["receivable_open_mdl"], me["payable_open_mdl"], me["current_balance"]) == (1000, 400, 600), me
 
-    main.get_by_role("button").filter(has_text=s.cp["name"]).first.click()
+    screen(main).get_by_role("button").filter(has_text=s.cp["name"]).first.click()
     expect(main).to_contain_text(re.compile(r"Расчёт сальдо\s*\+" + money(600)))
     expect(main).to_contain_text(re.compile(r"Счета к получению \(дебиторские\)\s*\+" + money(1000)))
     expect(main).to_contain_text(re.compile(r"Счета к оплате \(кредиторские\)\s*[−-]" + money(400)))
@@ -280,7 +280,7 @@ def test_reconciliation_act_page(fx_page: Page, s):
     # с 15.11 в строке дата: «Sold final la 15.11.2026 1 000,00»
     expect(main).to_contain_text(re.compile(r"Sold final(?: la [\d.]+)?\s*" + money(1000)))
     expect(main).to_contain_text(re.compile(re.escape(s.cp["name"]) + r" datorează " + money(1000)))
-    expect(main.get_by_role("button", name="Скачать PDF")).to_be_visible()
+    expect(screen(main).get_by_role("button", name="Скачать PDF")).to_be_visible()
 
 
 # ───────────────────────── кредиты ─────────────────────────
@@ -343,7 +343,7 @@ def test_credit_payment_and_close(fx_page: Page, s):
 
     open_credits(fx_page)
     main = fx_page.locator("main")
-    main.get_by_role("button", name="Закрытые", exact=True).click()
+    screen(main).get_by_role("button", name="Закрытые", exact=True).click()
     expect(main.get_by_text(credit["name"])).to_be_visible()
-    main.get_by_role("button", name="Активные", exact=True).click()
+    screen(main).get_by_role("button", name="Активные", exact=True).click()
     expect(main.get_by_text(credit["name"])).to_have_count(0)

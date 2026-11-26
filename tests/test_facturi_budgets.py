@@ -25,7 +25,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (QA_PREFIX, field, fx_delete, fx_get, fx_json, fx_post, fx_put, modal, open_fx,
+from helpers.facturi import (screen, QA_PREFIX, field, fx_delete, fx_get, fx_json, fx_post, fx_put, modal, open_fx,
                              stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -176,9 +176,9 @@ def test_plan_via_grid(fx_page: Page, b):
     cell = row.locator("input").first
     cell.fill("450")
     cell.press("Tab")  # «Сохранить план» оживает, когда ячейка теряет фокус
-    expect(fx_page.locator("main").get_by_role("button", name="Сохранить план (1)", exact=True)).to_be_enabled()
+    expect(screen(fx_page).get_by_role("button", name="Сохранить план (1)", exact=True)).to_be_enabled()
     with fx_page.expect_response(lambda r: f"/api/budgets/{bud['id']}/lines" in r.url and r.request.method == "PUT") as resp:
-        fx_page.locator("main").get_by_role("button", name="Сохранить план (1)", exact=True).click()  # счётчик правок
+        screen(fx_page).get_by_role("button", name="Сохранить план (1)", exact=True).click()  # счётчик правок
     assert resp.value.ok, resp.value.text()
 
     report = fx_json(fx_get(fx_page, f"/budgets/{bud['id']}/report"))
@@ -212,7 +212,7 @@ def test_status_flow(fx_page: Page, b):
     expect(main).to_contain_text("Черновик")
 
     for button, status, label in (("На согласование", "review", "На согласовании"), ("Утвердить", "approved", "Утверждён")):
-        main.get_by_role("button", name=button, exact=True).click()
+        screen(main).get_by_role("button", name=button, exact=True).click()
         # окно смены статуса: «Комментарий» и кнопка с тем же названием
         dialog = fx_page.locator("div.fixed.inset-0").filter(has=fx_page.get_by_text("Комментарий", exact=True)).last
         dialog.locator("textarea").fill(f"автотест: {label}")

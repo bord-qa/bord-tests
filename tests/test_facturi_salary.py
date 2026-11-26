@@ -30,7 +30,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (QA_PREFIX, field, fx_delete, fx_get, fx_json, fx_post, fx_put, maybe_confirm, modal,
+from helpers.facturi import (screen, QA_PREFIX, field, fx_delete, fx_get, fx_json, fx_post, fx_put, maybe_confirm, modal,
                              open_fx, pick, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -108,7 +108,7 @@ def test_staff_create_via_form(fx_page: Page, pay):
     name = f"{QA_PREFIX} Сотрудник {stamp()}"
     with fx_page.expect_response(lambda r: "/api/salary/staff" in r.url and r.request.method == "GET"):
         open_fx(fx_page, "/admin/salary/employees")
-    fx_page.locator("main").get_by_role("button", name="Добавить", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Добавить", exact=True).click()
     form = modal(fx_page, "Новый сотрудник")
     field(form, "ФИО").fill(name)
     field(form, "Должность").fill("Бухгалтер")
@@ -175,7 +175,7 @@ def test_absence_summary(fx_page: Page, pay):
 # Кейс: «Новое отсутствие» — сотрудник из «Сотрудников» есть в выпадашке
 def test_absence_form_lists_staff(fx_page: Page, pay):
     open_fx(fx_page, "/admin/salary/absences")
-    fx_page.locator("main").get_by_role("button", name="Сотрудник…").click()
+    screen(fx_page).get_by_role("button", name="Сотрудник…").click()
     expect(fx_page.get_by_role("option").filter(has_text=pay.staff["full_name"])).to_have_count(1, timeout=5_000)
 
 
@@ -253,10 +253,10 @@ def test_directories(fx_page: Page, pay):
     main = fx_page.locator("main")
     for label, path in (("Начисления", "accrual-types"), ("Удержания", "deduction-types"), ("Взносы", "contribution-types")):
         n = len(fx_json(fx_get(fx_page, f"/salary/{path}")))
-        expect(main.get_by_role("button", name=f"{label} ({n})")).to_be_visible()
+        expect(screen(main).get_by_role("button", name=f"{label} ({n})")).to_be_visible()
     expect(main.locator("tr").filter(has_text="SALARY")).to_contain_text("Оклад")
 
-    main.get_by_role("button", name="Добавить", exact=True).click()
+    screen(main).get_by_role("button", name="Добавить", exact=True).click()
     form = modal(fx_page, "Создать тип начисления")
     field(form, "Название").fill(f"{QA_PREFIX} начисление {stamp()}")
     with fx_page.expect_response(lambda r: "/api/salary/accrual-types" in r.url and r.request.method == "POST") as resp:
@@ -275,7 +275,7 @@ def test_generate_statement(fx_page: Page, pay):
     with fx_page.expect_response(lambda r: "/api/salary/statements?" in r.url):
         open_fx(fx_page, "/admin/salary")
     with fx_page.expect_response(lambda r: "/api/salary/statements/generate" in r.url) as resp:
-        fx_page.locator("main").get_by_role("button", name="Сформировать за месяц").click()
+        screen(fx_page).get_by_role("button", name="Сформировать за месяц").click()
     assert resp.value.ok, resp.value.text()
     data = resp.value.json()
     st = data["statement"]
@@ -318,7 +318,7 @@ def test_statement_approve_and_cancel(fx_page: Page, pay):
     main = fx_page.locator("main")
     main.get_by_text(st["title"]).first.click()
     with fx_page.expect_response(lambda r: f"/api/salary/statements/{st['id']}/approve" in r.url) as resp:
-        main.get_by_role("button", name="Утвердить", exact=True).click()
+        screen(main).get_by_role("button", name="Утвердить", exact=True).click()
         maybe_confirm(fx_page)
     assert resp.value.ok, resp.value.text()
     assert fx_json(fx_get(fx_page, f"/salary/statements/{st['id']}"))["status"] == "approved"

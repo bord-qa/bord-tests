@@ -31,7 +31,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (QA_PREFIX, confirm, maybe_confirm, field, fx_delete, fx_get, fx_json, fx_post, fx_put, modal,
+from helpers.facturi import (screen, QA_PREFIX, confirm, maybe_confirm, field, fx_delete, fx_get, fx_json, fx_post, fx_put, modal,
                              open_fx, pick, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -129,9 +129,9 @@ def test_payment_status_counts_match_api(fx_page: Page, m):
     by = counts.get("counts", counts)
     main = fx_page.locator("main")
     for label, key in (("Черновик", "draft"), ("Ожидает", "pending"), ("Завершён", "completed"), ("Отменён", "cancelled")):
-        expect(main.get_by_role("button", name=f"{label} ({by.get(key, 0)})")).to_be_visible()
+        expect(screen(main).get_by_role("button", name=f"{label} ({by.get(key, 0)})")).to_be_visible()
     total = by.get("all", by.get("total", sum(v for k, v in by.items() if k in ("draft", "pending", "completed", "cancelled"))))
-    expect(main.get_by_role("button", name=f"Все ({total})")).to_be_visible()
+    expect(screen(main).get_by_role("button", name=f"Все ({total})")).to_be_visible()
 
 
 # Кейс: Новый платёж через форму
@@ -307,8 +307,8 @@ def test_statement_preview(fx_page: Page, m, tmp_path):
     expect(main).to_contain_text(re.compile(r"Приход\s*" + money(1500)))
     expect(main).to_contain_text(re.compile(r"Расход\s*" + money(12.5)))
     expect(main).to_contain_text(m.cp["name"])
-    expect(main.get_by_role("button", name="Новые 2")).to_be_visible()
-    expect(main.get_by_role("button", name="Выберите счёт…")).to_be_visible()
+    expect(screen(main).get_by_role("button", name="Новые 2")).to_be_visible()
+    expect(screen(main).get_by_role("button", name="Выберите счёт…")).to_be_visible()
 
 
 # Кейс: Выписка CSV — загрузка операций на свой счёт
@@ -317,16 +317,22 @@ def test_statement_import_creates_payments(fx_page: Page, m, tmp_path):
     tag = stamp()
     upload_statement(fx_page, m, statement_csv(str(tmp_path), m, tag=tag))
     main = fx_page.locator("main")
-    main.get_by_role("button", name="Выберите счёт…").click()
+    screen(main).get_by_role("button", name="Выберите счёт…").click()
     fx_page.get_by_role("option").filter(has_text=m.acc["name"]).first.click()
-    load = main.get_by_role("button", name=re.compile(r"^Загрузить операции \(2\)"))
+    load = screen(main).get_by_role("button", name=re.compile(r"^Загрузить операции \(2\)"))
     expect(load).to_be_enabled()
     with fx_page.expect_response(lambda r: "/statement-imports/" in r.url and r.url.endswith("/confirm")) as resp:
         load.click()
         maybe_confirm(fx_page)
     assert resp.value.ok, resp.value.text()
 
-    pays = [p for p in m.payments() if tag in (p.get("description") or "") or tag in (p.get("name") or "")]
+    # платежи по подтверждённой выписке иногда появляются через секунду-две после ответа /confirm
+    # (ночной прогон 26.11 прочитал []), поэтому ждём их, а не читаем один раз
+    for _ in range(10):
+        pays = [p for p in m.payments() if tag in (p.get("description") or "") or tag in (p.get("name") or "")]
+        if len(pays) >= 2:
+            break
+        fx_page.wait_for_timeout(1_000)
     assert sorted((p["type"], p["amount"]) for p in pays) == [("expense", 12.5), ("income", 1500)], pays
     assert all(p["bank_account_id"] == m.acc["id"] for p in pays)
 
@@ -355,7 +361,7 @@ def test_recurring_payment(fx_page: Page, m):
     name = f"{QA_PREFIX} подписка {stamp()}"
     with fx_page.expect_response(lambda r: "/api/recurring-payments/" in r.url):
         open_fx(fx_page, "/admin/recurring")
-    fx_page.locator("main").get_by_role("button", name="Создать", exact=True).click()
+    screen(fx_page).get_by_role("button", name="Создать", exact=True).click()
     form = modal(fx_page, "Новый повторяющийся платёж")
     field(form, "Название").fill(name)
     field(form, "Сумма").fill("99")
@@ -369,7 +375,7 @@ def test_recurring_payment(fx_page: Page, m):
     assert (rp["name"], rp["amount"], rp["type"], rp["repeat_mode"], rp["is_active"]) == (
         name, 99, "expense", rp["repeat_mode"], True), rp
 
-    group = fx_page.locator("main").get_by_role("button").filter(has_text="Без категории").first
+    group = screen(fx_page).get_by_role("button").filter(has_text="Без категории").first
     row = fx_page.locator("main tr").filter(has_text=name)
     if not row.count():
         group.click()  # группы статей свёрнуты

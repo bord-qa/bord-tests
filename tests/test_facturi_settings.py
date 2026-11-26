@@ -33,7 +33,7 @@ import re
 import pytest
 from playwright.sync_api import Page, expect
 
-from helpers.facturi import (FACTURI, QA_PREFIX, confirm, field, fx_delete, fx_get, fx_json, fx_post, fx_put,
+from helpers.facturi import (screen, FACTURI, QA_PREFIX, confirm, field, fx_delete, fx_get, fx_json, fx_post, fx_put,
                              open_fx, stamp)
 
 pytestmark = pytest.mark.requires_auth
@@ -72,7 +72,7 @@ def test_settings_hub(fx_page: Page):
             # по началу текста: в описании «Выгрузки в 1С» (с 10.11) есть слово «Контрагенты»
             link = section.get_by_role("link").filter(has_text=re.compile("^" + re.escape(name)))
             expect(link, name).to_have_attribute("href", href)
-    main.get_by_role("link").filter(has_text="Почта для документов").first.click()
+    screen(main).get_by_role("link").filter(has_text="Почта для документов").first.click()
     expect(fx_page).to_have_url(FACTURI + "/admin/settings/email")
     expect(fx_page).to_have_title("Почта — Facturi")
 
@@ -158,10 +158,10 @@ def test_template_from_builtin(fx_page: Page, templates):
     main = fx_page.locator("main")
     expect(main.get_by_text("Factură de plată (încorporat, RO)").first).to_be_visible()
     expect(main.locator("textarea")).to_have_value(re.compile(r'<html lang="ro"'))
-    expect(main.get_by_role("button", name=re.compile(r"^\{\{number\}\}"))).to_be_visible()
+    expect(screen(main).get_by_role("button", name=re.compile(r"^\{\{number\}\}"))).to_be_visible()
     expect(head(fx_page).get_by_title("Шаблоны документов")).to_have_text("Шаблоны документов1")
 
-    main.get_by_role("button", name="Удалить", exact=True).click()
+    screen(main).get_by_role("button", name="Удалить", exact=True).click()
     with fx_page.expect_response(lambda r: f"/api/pdf-templates/{tpl['id']}" in r.url and r.request.method == "DELETE") as gone:
         text = confirm(fx_page, "Да")
     assert "Удалить шаблон «Factură de plată (încorporat, RO)»?" in text
@@ -217,7 +217,7 @@ def test_plugin_toggle(fx_page: Page):
 # Кейс: Плагины — поиск по названию
 def test_plugins_search(fx_page: Page):
     open_fx(fx_page, "/admin/plugins")
-    fx_page.locator("main").get_by_placeholder("Поиск плагина...").fill("Зарплата")
+    screen(fx_page).get_by_placeholder("Поиск плагина...").fill("Зарплата")
     titles = fx_page.locator("main h3")
     expect(titles).to_have_text(["Зарплата", "Зарплата от сделок"])
 
@@ -245,11 +245,11 @@ def test_automations(fx_page: Page):
         open_fx(fx_page, "/admin/automations")
     counts = resp.value.json()["counts"]
     main = fx_page.locator("main")
-    expect(main.get_by_role("button", name=f"Услуги · {counts['services']}")).to_be_visible()
+    expect(screen(main).get_by_role("button", name=f"Услуги · {counts['services']}")).to_be_visible()
 
     posts = []
     fx_page.on("request", lambda r: posts.append(r.url) if r.method != "GET" and "/api/" in r.url else None)
-    main.get_by_role("button", name="Услуга", exact=True).click()
+    screen(main).get_by_role("button", name="Услуга", exact=True).click()
     form = fx_page.locator("div.fixed.inset-0").filter(has=fx_page.get_by_role("heading", name="Новая услуга")).last
     for text in ("Продаём (доход)", "Покупаем (расход)", "Посмотреть, что изменится"):
         expect(form.get_by_role("button", name=text)).to_be_visible()
@@ -292,7 +292,7 @@ def test_email_settings(fx_page: Page, email_restore):
     name = f"{QA_PREFIX} {stamp()}"
     field(main, "Имя отправителя").fill(name)
     with fx_page.expect_response(lambda r: "/api/email-settings" in r.url and r.request.method == "PUT") as resp:
-        main.get_by_role("button", name="Сохранить", exact=True).click()
+        screen(main).get_by_role("button", name="Сохранить", exact=True).click()
     assert resp.value.ok, resp.value.text()
     assert fx_json(fx_get(fx_page, "/email-settings/"))["email_from_name"] == name
     fx_page.reload()
@@ -306,8 +306,8 @@ def test_efactura_settings(fx_page: Page):
     main = fx_page.locator("main")
     expect(main.get_by_text("Нет подключений")).to_be_visible()
     for tab in ("Полнота", "Автовыставление", "Подписанты", "Логи API", "Подключения"):
-        main.get_by_role("button", name=tab, exact=True).click()
-        expect(main.get_by_role("button", name=tab, exact=True)).to_be_visible()
+        screen(main).get_by_role("button", name=tab, exact=True).click()
+        expect(screen(main).get_by_role("button", name=tab, exact=True)).to_be_visible()
     expect(main.get_by_text("Нет подключений")).to_be_visible()
 
 
@@ -320,4 +320,4 @@ def test_bank_integrations(fx_page: Page):
     if not creds:
         expect(main.get_by_text("Нет подключений")).to_be_visible()
     for tab in ("Выписки файлом", "Оплаты картой", "Подключения"):
-        expect(main.get_by_role("button", name=tab, exact=True)).to_be_visible()
+        expect(screen(main).get_by_role("button", name=tab, exact=True)).to_be_visible()

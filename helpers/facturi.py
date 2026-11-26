@@ -22,7 +22,7 @@
 import datetime as dt
 import re
 
-from playwright.sync_api import APIResponse, Browser, Page, expect
+from playwright.sync_api import APIResponse, Browser, Locator, Page, expect
 
 FACTURI = "https://app.facturi.md"
 QA_PREFIX = "QA Autotest"
@@ -48,6 +48,16 @@ def make_state(browser: Browser, context_args: dict, bord_state: str, path: str)
     ctx.storage_state(path=path)
     ctx.close()
     return path
+
+
+def screen(where) -> Locator:
+    """Тело экрана вместе с его шапкой.
+
+    С ~25.11.2026 вкладки-фильтры («Все (297)», «Начисления (2)»), поиск и кнопки действий
+    («Создать оффер», «Добавить», «Основной») переехали из main в sticky-шапку экрана (header).
+    Кнопки / поля / метки ищем в обоих; проверки текста тела экрана остаются на main."""
+    page = where.page if isinstance(where, Locator) else where
+    return page.locator("header:visible, main")
 
 
 def open_fx(page: Page, path: str = "/admin") -> Page:
