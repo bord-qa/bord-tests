@@ -8,6 +8,8 @@
 - заведения: /admin/crm/venues (ссылка из подсказки на экране бронирования), «+
   Заведение» → окно, «Создать» неактивна без названия и slug, занятый slug — 409 и
   текст внизу формы. Строка раскрывается: блок Syrve и «Залов нет…»;
+- 26.11.2026: счётчик шапки — «Заведения и залы»; Syrve стал необязательным («Касса Syrve
+  не подключена…»), залы добавляются вручную кнопкой «Добавить зал» (ещё не покрыто);
 - без плагина Syrve экраны показывают сырой текст «Plugin 'syrve' is not enabled…»
   и ложное «Нет заведений» — bord-19;
 - цены: /admin/crm/booking/prices, программы POST /reservations/venues/<id>/programs
@@ -126,7 +128,8 @@ def test_venues_match_api(booking: Page):
 
     api = crm_get(booking, "/venues/").json()["items"]
 
-    expect(booking.get_by_title("Заведения", exact=True)).to_have_text(f"Заведения{len(api)}")
+    # 26.11: счётчик в шапке переименован «Заведения» → «Заведения и залы»
+    expect(booking.get_by_title("Заведения и залы", exact=True)).to_have_text(f"Заведения и залы{len(api)}")
     for v in api:
         expect(venue_row(booking, v["name"])).to_be_visible()
     expect(booking.locator("main").get_by_text(f"/{venue['slug']}")).to_be_visible()
@@ -228,7 +231,7 @@ def test_delete_venue(booking: Page):
     assert crm_get(booking, f"/venues/{venue['id']}").status == 404
 
 
-# Кейс: Строка заведения раскрывается: Syrve не настроен, залов нет
+# Кейс: Строка заведения раскрывается: касса Syrve не подключена, залов нет
 def test_venue_details(booking: Page):
     venue = create_venue(booking)
     reload_venues(booking)
@@ -236,8 +239,10 @@ def test_venue_details(booking: Page):
     venue_row(booking, venue["name"]).click()
 
     main = booking.locator("main")
-    expect(main).to_contain_text("Syrve не настроен")
-    expect(main).to_contain_text("Залов нет. Синхронизируйте из Syrve")
+    # 26.11: Syrve больше не обязателен — залы добавляются вручную («Добавить зал»)
+    expect(main).to_contain_text("Касса Syrve не подключена")
+    expect(main).to_contain_text("Залов нет. Добавьте зал")
+    expect(main.get_by_role("button", name="Добавить зал")).to_be_visible()
 
 
 # Кейс: Заведение без залов — календарь объясняет, что делать
