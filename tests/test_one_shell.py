@@ -30,6 +30,7 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from helpers.api import api_get
+from helpers.artifacts import save_failure
 
 pytestmark = pytest.mark.requires_auth
 
@@ -53,20 +54,22 @@ def one_context(browser: Browser, auth_state: str, context_args: dict, tour_done
 
 
 @pytest.fixture
-def one(browser, auth_state, browser_context_args):
+def one(request, browser, auth_state, browser_context_args):
     """Страница тест-учётки в виде BORD One, тур отмечен пройденным."""
     ctx = one_context(browser, auth_state, browser_context_args)
     page = ctx.new_page()
     yield page
+    save_failure(request, page)
     ctx.close()
 
 
 @pytest.fixture
-def fresh(browser, auth_state, browser_context_args):
+def fresh(request, browser, auth_state, browser_context_args):
     """BORD One без отметки о туре — как у человека, впервые открывшего единое окно."""
     ctx = one_context(browser, auth_state, browser_context_args, tour_done=False)
     page = ctx.new_page()
     yield page
+    save_failure(request, page)
     ctx.close()
 
 

@@ -8,8 +8,9 @@
 - «Документы»: …/invoices?side=&state=&limit=25&offset=0 (+q), в шапке
   «Нам должны / Мы должны», «Открытые / Просроченные / Оплаченные / Все»,
   поиск «Номер документа или контрагент» (по Enter, &q=), пусто — «Документов нет.»;
-- «Долги»: …/debtors?side=&limit=50, в шапке те же «Нам/Мы должны» и сумма,
-  пусто — «Никто не должен.» / «Компания никому не должна.»;
+- «Долги»: …/debtors?side=&limit=50 → items[{counterparty_name, outstanding_mdl,
+  overdue_mdl…}], в шапке те же «Нам/Мы должны» и сумма — это сумма
+  outstanding_mdl этого ответа (страница /home не запрашивает), пусто — «Никто не должен.» / «Компания никому не должна.»;
 - главное меню страницы рисуется после загрузки — ждём по тексту, не по main.
 
 В BORD QA финансовых данных нет (всё 0,00) — тесты сверяют экран с API и
@@ -148,6 +149,25 @@ def test_debtors_sides_match_api(auth_page: Page, label, side, other, empty):
         expect(auth_page.locator("main").get_by_text(empty)).to_be_visible()
     else:
         expect(auth_page.locator("main").locator("tbody tr, li")).to_have_count(len(data["items"]))
-    home = api_get(auth_page, f"{API}home").json()
-    expect(bar).to_contain_text(lei(home[side]["total_mdl"]))
+    # сумма в шапке считается из того же ответа /debtors, что и список
+    outstanding = round(sum(i["outstanding_mdl"] for i in data["items"]), 2)
+    expect(bar).to_contain_text(lei(outstanding))
+
+    # «Обзор» (/home) и «Долги» (/debtors) — разные запросы к Facturi. Данные BORD QA
+    # меняют и люди: 27.11 в ночном /home дал «Мы должны» 222,22 при пустом списке,
+    # через полчаса оба 0. Поэтому сверяем свежую пару ответов и ждём, пока сойдётся;
+    # расхождение, которое держится, — повод разбираться.
+    pairs = []
+    for _ in range(4):
+        home = api_get(auth_page, f"{API}home").json()[side]["total_mdl"]
+        fresh = api_get(auth_page, f"{API}debtors?side={side}&limit=50").json()
+        if fresh["total"] > len(fresh["items"]):
+            break  # должников больше страницы — по одной странице сумму не сложить
+        listed = round(sum(i["outstanding_mdl"] for i in fresh["items"]), 2)
+        pairs.append((home, listed))
+        if round(home, 2) == listed:
+            break
+        auth_page.wait_for_timeout(3_000)
+    else:
+        pytest.fail(f"{side}: /home total_mdl ≠ сумме /debtors (home, debtors) по 4 чтениям: {pairs}")
     expect(bar.get_by_role("link", name="Открыть в facturi")).to_have_attribute("href", f"{FACTURI}/debtors")

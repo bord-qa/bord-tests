@@ -5,8 +5,10 @@
   справочники вида/ролей — /api/counterparties/meta; таблица «Название, IDNO,
   Город, Контакты, Роль, Модули»; пусто по поиску — «Ничего не нашлось…»;
 - «Добавить контрагента» → окно «Новый контрагент» (div.fixed.inset-0, не
-  role=dialog): Вид (Компания / Физическое лицо), Название, Юр. название, IDNO,
-  Код НДС, Страна, Город, Адрес, Почта, Телефон, Заметки → POST
+  role=dialog): Вид (с 26.11 «Юр. лицо / Физ. лицо», было «Компания / Физическое
+  лицо»; та же плашка в карточке и фильтр «Все виды» списка), Название, Юр. название,
+  IDNO (у физлица — «IDNP/IDNO»), Код НДС, Страна, Город, Адрес, Директор, Почта,
+  Телефон, Заметки → POST
   /api/counterparties/ → 201, URL ?id=<id>, окно карточки с «Реквизитами» (helpers/modal.py);
 - уникальность по IDNO: при вводе POST …/resolve находит карточку и форма
   пишет «IDNO … уже у карточки «…» (№ …)», сохранение → 409;
@@ -126,7 +128,7 @@ def test_company_create_shows_card_and_row(cp: Page):
     assert card_data["kind"] == "company" and card_data["idno"] == stamp and card_data["city"] == "Кишинёв"
     expect(cp).to_have_url(re.compile(rf"\?id={card_data['id']}$"))
     card = modal(cp, name)
-    expect(card).to_contain_text("Компания")
+    expect(card).to_contain_text("Юр. лицо")
     for label, value in values.items():
         expect(requisite(card, label), label).to_have_text(value)
     expect(card).to_contain_text(f"№ {card_data['id']}")
@@ -149,24 +151,24 @@ def test_person_create_and_kind_filter(cp: Page):
     name = f"{NAME_PREFIX} Ион {unique()}"
     screen_button(cp, "Добавить контрагента").first.click()
     form = modal(cp, "Новый контрагент")
-    form.get_by_role("button", name="Компания").click()
-    cp.get_by_role("option", name="Физическое лицо").click()
+    form.get_by_role("button", name="Юр. лицо").click()
+    cp.get_by_role("option", name="Физ. лицо").click()
     form.get_by_placeholder("Ион Пример").fill(name)
     with cp.expect_response(lambda r: r.url.endswith(API) and r.request.method == "POST") as created:
         form.get_by_role("button", name="Сохранить").click()
 
     assert created.value.status == 201 and created.value.json()["kind"] == "person"
-    expect(modal(cp, name)).to_contain_text("Физическое лицо")
+    expect(modal(cp, name)).to_contain_text("Физ. лицо")
     close_modal(cp, name)
     find(cp, NAME_PREFIX)
 
     screen_button(cp, "Все виды").click()
-    cp.get_by_role("option", name="Физическое лицо").click()
+    cp.get_by_role("option", name="Физ. лицо").click()
     expect(rows(cp).filter(has_text=name)).to_have_count(1)
     expect(rows(cp).filter(has_text=company["name"])).to_have_count(0)
 
-    screen_button(cp, "Физическое лицо").click()
-    cp.get_by_role("option", name="Компания").click()
+    screen_button(cp, "Физ. лицо").click()
+    cp.get_by_role("option", name="Юр. лицо").click()
     expect(rows(cp).filter(has_text=company["name"])).to_have_count(1)
     expect(rows(cp).filter(has_text=name)).to_have_count(0)
 

@@ -7,9 +7,10 @@
   on_request, plans[…]}; у модулей-надстроек (base: PMS → HDS, CLM → DMS,
   инциденты → безопасность) и бесплатных цены нет;
 - «Биллинг» (/admin/subscription): сводка «В месяц, без НДС», баланс, карта;
-  «Подписки» — строка на каждый модуль с ценой: название, «· <тариф>»,
-  статус («Пробный период»), «N лей / мес», у тарифа за человека
-  «(N чел. × M лей)»; кнопки «Оплатить картой», «Сменить тариф» (если тарифов
+  «Подписки» — строка на каждый модуль с ценой (с 26.11 — колонки с подписями
+  «Тариф / Статус / Пользователи / Цена / Ближайшее списание», подписи видны
+  только на узком экране): тариф, статус («Пробный период»), «N чел.»,
+  «N лей / мес» и под ней у тарифа за человека «N × M лей»; кнопки «Оплатить картой», «Сменить тариф» (если тарифов
   больше одного), «Отменить»; ниже «История» (Счета / Оплаты / Баланс);
   с 10.11 цена за единицу без числа единиц (Маркетинг: units/amount_bani = null)
   пишется «3 600 лей за рекламный аккаунт»;
@@ -66,6 +67,12 @@ def subscription(page: Page, module: dict):
     return page.locator("main li").filter(has=page.get_by_text(module["name"], exact=True))
 
 
+def cell(row, label: str):
+    """Значение колонки строки подписки по её подписи («Тариф», «Цена»…)."""
+    column = row.locator(":scope > div").filter(has=row.page.locator("span", has_text=re.compile(rf"^{label}$")))
+    return column.locator(":scope > div")
+
+
 # Кейс: Подписки совпадают с API
 @pytest.mark.smoke
 def test_subscriptions_match_api(billing):
@@ -81,18 +88,19 @@ def test_subscriptions_match_api(billing):
         price = module["price"]
         row = subscription(page, module)
         expect(row, module["key"]).to_have_count(1)
-        expect(row).to_contain_text(f"· {price['plan_name']}")
+        expect(cell(row, "Тариф"), module["key"]).to_have_text(price["plan_name"])
+        cost = cell(row, "Цена")
         if not price["amount_bani"]:
             # цена за единицу без числа единиц: «3 600 лей за рекламный аккаунт»
-            expect(row).to_contain_text(re.compile(
+            expect(cost).to_contain_text(re.compile(
                 rf"{lei(price['unit_bani'])}\s+лей за {re.escape(price['unit_name'])}"))
             continue
-        expect(row).to_contain_text(re.compile(lei(price["amount_bani"]) + r"\s+лей / мес"))
+        expect(cost).to_contain_text(re.compile(lei(price["amount_bani"]) + r"\s+лей / мес"))
         if price["per_unit"] and price["units"]:
-            # «пользователь» пишется «чел.», остальные единицы — как в API («3 рекламный аккаунт × …»)
+            # «пользователь» пишется «чел.», остальные единицы — как в API
             unit = "чел." if price["unit_name"] == "пользователь" else price["unit_name"]
-            expect(row).to_contain_text(re.compile(
-                rf"\({price['units']} {re.escape(unit)} ×\s+{lei(price['unit_bani'])}\s+лей\)"))
+            expect(cell(row, "Пользователи"), module["key"]).to_have_text(f"{price['units']} {unit}")
+            expect(cost).to_contain_text(re.compile(rf"{price['units']} ×\s+{lei(price['unit_bani'])}\s+лей"))
     if orphan == ["cms"]:
         pytest.xfail("bord-669: подписка CMS есть в биллинге, модуля CMS нет в «Модулях» и /api/subscription")
     assert not orphan, f"подписки без модуля в /api/subscription: {orphan}"

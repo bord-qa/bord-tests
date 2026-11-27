@@ -3,6 +3,14 @@ import pytest
 from helpers.auth import classic_view, load_user, login
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """item.rep_call — чтобы фикстуры со своими контекстами знали, упал ли тест."""
+    outcome = yield
+    report = outcome.get_result()
+    setattr(item, f"rep_{report.when}", report)
+
+
 @pytest.fixture(scope="session")
 def browser_context_args(browser_context_args):
     return {
